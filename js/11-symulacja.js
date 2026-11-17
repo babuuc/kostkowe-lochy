@@ -48,7 +48,7 @@ function updateNodes(dt) {
     if (n.hitT > 0) n.hitT -= dt;
     else if (n.hp < n.maxHp) n.hp = Math.min(n.maxHp, n.hp + n.maxHp * (n.own === 0 ? 0.02 : 0.012) * dt);
     if (n.own === 1) {
-      const want = n.kids >= 3;
+      const want = n.kids >= (level.shieldAt || 3);
       if (n.shield && !want) {
         n.shield = false;
         n.lock = 12;
@@ -151,6 +151,7 @@ function updateSim(dt) {
   updateHero(dt);
   for (let i = 0; i < units.length; i++) updateUnit(units[i], dt);
   separate();
+  updateTraps(dt);
   updateNodes(dt);
   updateProjs(dt);
   updatePickups(dt);
@@ -186,7 +187,9 @@ function updateLights(dt) {
     const fade = clamp((cut - s.d) / 5, 0, 1);
     if (s.node) {
       Lt.color.setHex(s.node.own === 0 ? COL_P : COL_E);
-      Lt.intensity = s.int * mul * fade * (1 + s.node.pulse * 0.6);
+      // w kryptach przejęte kapliczki rozświetlają mrok mocniej
+      const lit = s.node.own === 0 && theme.key === 'crypt';
+      Lt.intensity = s.int * mul * fade * (1 + s.node.pulse * 0.6) * (lit ? 1.5 : 1);
     } else {
       Lt.color.setHex(s.color);
       Lt.intensity =
@@ -195,7 +198,7 @@ function updateLights(dt) {
         fade *
         (0.86 + 0.1 * Math.sin(time * 11 + s.ph) + 0.06 * Math.sin(time * 23 + s.ph * 2.3));
     }
-    Lt.distance = s.range;
+    Lt.distance = s.node && s.node.own === 0 && theme.key === 'crypt' ? s.range * 1.35 : s.range;
     Lt.position.set(s.x, s.y, s.z);
   }
   if (state === 'play' && !hero.dead) {
@@ -282,6 +285,19 @@ function updateAmbient(dt) {
     else if (c.z - camT.z < -48) c.z += 96;
     c.m.position.set(c.x, 7.5, c.z);
   }
+  const ms = !!(theme && theme.mist);
+  for (const c of mists) {
+    c.m.visible = ms;
+    if (!ms) continue;
+    c.x += dt * c.s;
+    c.z += dt * 0.25;
+    if (c.x - camT.x > 40) c.x -= 80;
+    else if (c.x - camT.x < -40) c.x += 80;
+    if (c.z - camT.z > 40) c.z -= 80;
+    else if (c.z - camT.z < -40) c.z += 80;
+    c.m.position.set(c.x, theme.underY + 0.45, c.z);
+    c.m.material.opacity = 0.14 + 0.05 * Math.sin(time * 0.5 + c.s * 7);
+  }
   moteT -= dt;
   if (moteT <= 0 && theme) {
     const k = theme.key;
@@ -289,6 +305,7 @@ function updateAmbient(dt) {
     const x = camT.x + rnd(-16, 16),
       z = camT.z + rnd(-16, 16);
     if (k === 'forest') sparks.burst(x, rnd(0.4, 2.6), z, theme.mote, 1, 0.5, 0.07, 3, -0.25);
+    else if (k === 'crypt') sparks.burst(x, rnd(0.1, 1.6), z, theme.mote, 1, 0.35, 0.07, 3.6, -0.35);
     else if (k === 'desert') sparks.burst(x, rnd(0.2, 2), z, theme.mote, 1, 1.6, 0.05, 2.2, 0.3);
     else if (!walkAt(x, z)) {
       if (Math.random() < 0.06) sparks.burst(x, theme.underY + 0.1, z, 0xffc050, 6, 3, 0.12, 0.6);
@@ -309,6 +326,7 @@ function updateAmbient(dt) {
   sparks.update(dt);
   debris.update(dt);
   updateFx(dt);
+  updateBossFx(dt);
   updateDmg(dt);
   updateCorpses(dt);
   updateLights(dt);
@@ -326,7 +344,8 @@ let lastHurtO = 0;
 
 /* ================= kamera ================= */
 const camT = { x: G / 2, z: G / 2 };
-let camDist = 26,
+let camZoom = 1,
+  camDist = 26,
   camRX = 1,
   camRZ = 0,
   camFX = 0,
@@ -350,9 +369,20 @@ function updateCamera(dt) {
     camT.x = damp(camT.x, mapCx, 2, dt);
     camT.z = damp(camT.z, mapCz, 2, dt);
   } else if (!hero.dead) {
-    camT.x = damp(camT.x, hero.x + hero.vx * 0.22, 6.5, dt);
-    camT.z = damp(camT.z, hero.z + hero.vz * 0.22, 6.5, dt);
+    // w walce z bossem kamera celuje między bohatera a bossa i lekko się oddala, żeby oba były w kadrze
+    let tx = hero.x + hero.vx * 0.22,
+      tz = hero.z + hero.vz * 0.22,
+      zoom = 1;
+    if (boss && !boss.dead && Math.hypot(boss.x - hero.x, boss.z - hero.z) < 16) {
+      tx += (boss.x - hero.x) * 0.35;
+      tz += (boss.z - hero.z) * 0.35;
+      zoom = 1.12;
+    }
+    camT.x = damp(camT.x, tx, 6.5, dt);
+    camT.z = damp(camT.z, tz, 6.5, dt);
+    camZoom = damp(camZoom, zoom, 2, dt);
   }
+  if (state !== 'menu') d *= camZoom;
   trauma = Math.max(0, trauma - dt * 1.9);
   const s = trauma * trauma * 0.7,
     ox = (Math.random() - 0.5) * s,
@@ -366,8 +396,8 @@ function updateCamera(dt) {
     camT.z + Math.cos(yaw) * cp * d + oz
   );
   camera.lookAt(camT.x + ox, 0.7 + oy, camT.z + oz);
-  scene.fog.near = d + 4;
-  scene.fog.far = d + 46;
+  scene.fog.near = d + (theme.fogN !== undefined ? theme.fogN : 4);
+  scene.fog.far = d + (theme.fogF !== undefined ? theme.fogF : 46);
   // cień: środek przyciągany do siatki tekseli, żeby krawędzie nie migotały przy ruchu kamery
   const sv = theme.sunV,
     R = theme.sR,

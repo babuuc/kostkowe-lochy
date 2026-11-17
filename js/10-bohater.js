@@ -93,8 +93,10 @@ function heroStrike() {
       d = Math.hypot(dx, dz);
     if (d < range + u.r && (d < 1 || Math.abs(angDiff(h.face, Math.atan2(dx, dz))) < arc / 2)) {
       const crit = focus || Math.random() < 0.12;
-      hurt(u, h.atk * mul * (fin ? 1.8 : 1) * rnd(0.9, 1.1) * (crit ? 2 : 1), h.x, h.z, fin ? 11 : 6, crit);
-      hits++;
+      if (
+        hurt(u, h.atk * mul * (fin ? 1.8 : 1) * rnd(0.9, 1.1) * (crit ? 2 : 1), h.x, h.z, fin ? 11 : 6, crit)
+      )
+        hits++;
       critAny = critAny || crit;
     }
   }
@@ -110,6 +112,7 @@ function heroStrike() {
       else if (!hits) hits = -1;
     }
   }
+  smashUrns(h.x, h.z, range, h.face, arc);
   if (fin) {
     const s = Math.sin(h.face),
       c = Math.cos(h.face);
@@ -271,9 +274,8 @@ function heroSpin() {
   for (const u of units) {
     if (u.team !== 1 || u.dead) continue;
     if (Math.hypot(u.x - h.x, u.z - h.z) < 3.8 + u.r) {
-      hurt(u, h.atk * 2.6 * mul, h.x, h.z, 14, true);
+      if (hurt(u, h.atk * 2.6 * mul, h.x, h.z, 14, true)) hits++;
       u.stun = Math.max(u.stun, 0.5);
-      hits++;
     }
   }
   for (const n of nodes) {
@@ -283,6 +285,7 @@ function heroSpin() {
       if (!sh) hits++;
     }
   }
+  smashUrns(h.x, h.z, 3.8);
   if (hits) {
     addCombo(hits);
     hitstop = 0.08;

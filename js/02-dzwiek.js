@@ -131,6 +131,18 @@ const sfx = {
   lose() {
     [392, 330, 262, 196].forEach((f, i) => tone(f, 0.45, 'triangle', 0.16, 0, i * 0.2));
   },
+  wail() {
+    tone(330, 0.55, 'sine', 0.07, 260);
+    tone(336, 0.55, 'sine', 0.05, 250);
+  },
+  dash() {
+    noise(0.3, 0.22, 1700, 0.6);
+    tone(620, 0.28, 'sine', 0.08, -380);
+  },
+  trap() {
+    noise(0.12, 0.25, 2600, 1.2);
+    tone(180, 0.12, 'square', 0.08, -60);
+  },
   click() {
     tone(660, 0.06, 'square', 0.07);
   },
@@ -176,6 +188,7 @@ const SCALES = {
   forest: [220, 261.6, 293.7, 329.6, 392, 440, 523.3, 587.3],
   desert: [196, 207.7, 246.9, 261.6, 293.7, 311.1, 392, 415.3],
   lava: [146.8, 174.6, 196, 220, 233.1, 293.7, 349.2, 392],
+  crypt: [110, 130.8, 146.8, 155.6, 196, 207.7, 261.6, 311.1],
 };
 let musT = 0,
   musStep = 0,
@@ -184,10 +197,10 @@ function music(dt) {
   if (!actx || save.mute || !theme) return;
   musT -= dt;
   if (musT > 0) return;
-  musT += 0.44;
+  musT += boss ? 0.3 : 0.44;
   musStep++;
   const sc = SCALES[theme.key];
-  if (musStep % 8 === 1) tone(sc[0] / 2, 1.8, 'sine', 0.07);
+  if (musStep % (boss ? 4 : 8) === 1) tone(sc[0] / 2, 1.8, 'sine', 0.07);
   if (Math.random() < 0.62) {
     musNote = clamp(musNote + ((Math.random() * 5) | 0) - 2, 0, sc.length - 1);
     tone(sc[musNote], 0.9, 'triangle', 0.035);

@@ -292,6 +292,81 @@ function buildModel(type, root) {
     }
     P.col = skin;
     P.lean = 0.12;
+  } else if (type === 'skelet') {
+    // kościany wojownik: zardzewiały hełm, tarcza i miecz
+    const bone = 0xe2ded0,
+      bd = 0xb8b3a2,
+      rust = 0x6a5a4a;
+    P = humanoid(root, {
+      legH: 0.4,
+      legW: 0.12,
+      legC: bone,
+      bodyW: 0.4,
+      bodyH: 0.48,
+      bodyD: 0.22,
+      bodyC: bd,
+      headW: 0.42,
+      headH: 0.4,
+      headD: 0.42,
+      headC: bone,
+      armW: 0.11,
+      armH: 0.48,
+      armC: bone,
+    });
+    const H = P.head,
+      B = P.body;
+    for (let k = 0; k < 3; k++) box(B, 0.34, 0.04, 0.02, 0x6a6658, 0, 0.16 + k * 0.11, 0.115, 0, 1);
+    box(B, 0.44, 0.12, 0.26, rust, 0, 0.44, 0, 0, 1);
+    for (const s of [-1, 1]) {
+      box(H, 0.11, 0.11, 0.04, 0x18181c, s * 0.1, 0.22, 0.21, 0, 1);
+      eye(P, H, 0.05, 0.05, LICH_C, LICH_C, s * 0.1, 0.22, 0.225);
+      box(s < 0 ? P.kneeL : P.kneeR, 0.15, 0.06, 0.2, bd, 0, -0.17, 0.03, 0, 1);
+    }
+    box(H, 0.48, 0.2, 0.48, rust, 0, 0.36, 0);
+    box(H, 0.1, 0.24, 0.06, rust, 0, 0.24, 0.24, 0, 1);
+    box(H, 0.06, 0.16, 0.06, 0x8a2f3a, 0, 0.54, 0, 0, 1);
+    box(P.elbR, 0.08, 0.08, 0.3, rust, 0, -0.22, 0.08, 0, 1);
+    box(P.elbR, 0.07, 0.07, 0.8, 0xa8b0b4, 0, -0.22, 0.6);
+    box(P.elbL, 0.06, 0.46, 0.42, rust, -0.09, -0.2, 0.04);
+    box(P.elbL, 0.04, 0.12, 0.12, 0xa8b0b4, -0.12, -0.2, 0.04, 0, 1);
+    P.col = bone;
+  } else if (type === 'lich') {
+    P = buildLich(root);
+  } else if (type === 'wraith') {
+    // upiór: unosi się nad ziemią, nie ma nóg, szarżuje po linii
+    const robe = 0x35525c,
+      rd = 0x253b43,
+      gl = 0x7fffd8;
+    const b = new THREE.Group();
+    b.position.y = 0.35;
+    root.add(b);
+    P = { body: b, eyes: [], col: robe, lean: 0.22, wraith: true };
+    box(b, 0.62, 0.5, 0.46, robe, 0, 0.75, 0);
+    box(b, 0.54, 0.34, 0.4, rd, 0, 0.36, -0.02);
+    box(b, 0.66, 0.08, 0.5, 0x2c4a44, 0, 0.98, 0, 0, 1);
+    const tail = new THREE.Group();
+    tail.position.y = 0.2;
+    b.add(tail);
+    P.tail = tail;
+    box(tail, 0.4, 0.3, 0.3, rd, 0, -0.12, -0.06);
+    box(tail, 0.22, 0.26, 0.2, shade(rd, -0.04), 0, -0.38, -0.14);
+    const head = new THREE.Group();
+    head.position.y = 1.0;
+    b.add(head);
+    P.head = head;
+    box(head, 0.52, 0.48, 0.52, robe, 0, 0.24, -0.02);
+    box(head, 0.36, 0.3, 0.06, 0x05080a, 0, 0.2, 0.245, 0, 1);
+    box(head, 0.16, 0.16, 0.24, robe, 0, 0.5, -0.24, 0, 1);
+    for (const s of [-1, 1]) {
+      eye(P, head, 0.09, 0.07, gl, gl, s * 0.08, 0.22, 0.28);
+      const a = new THREE.Group();
+      a.position.set(s * 0.4, 0.95, 0);
+      b.add(a);
+      box(a, 0.18, 0.52, 0.22, robe, 0, -0.22, 0.02);
+      box(a, 0.12, 0.14, 0.14, 0xcfe8e0, 0, -0.54, 0.04, 0, 1);
+      P[s < 0 ? 'armL' : 'armR'] = a;
+    }
+    glowSprite(b, gl, 2.6, 0, 0.8, 0, 0.42);
   } else if (type === 'golem') {
     const st = 0x9db4c0,
       sd = 0x7f97a4;
@@ -345,7 +420,8 @@ function makeUnit(type, x, z, home) {
   const def = UNIT[type],
     ally = !!def.ally,
     sc = ally ? (1 + 0.15 * levelIdx) * (1 + 0.25 * save.up.gol) : 1 + 0.24 * levelIdx;
-  const elite = !ally && levelIdx > 0 && !def.boss && !def.bomb && !def.heal && Math.random() < 0.1;
+  const elite =
+    !ally && levelIdx > 0 && !def.boss && !def.bomb && !def.heal && Math.random() < (level.elite || 0.1);
   const u = {
     type,
     def,
@@ -383,7 +459,7 @@ function makeUnit(type, x, z, home) {
     dead: false,
     spawnT: 0.45,
     spawnDur: 0.45,
-    baseScale: type === 'boss' ? 1.75 : elite ? 1.28 : 1,
+    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.62 : elite ? 1.28 : 1,
     h: def.h * (elite ? 1.25 : 1),
     meshes: [],
     pcol: 0xffffff,
@@ -415,10 +491,10 @@ function makeUnit(type, x, z, home) {
   u.bar = makeBar(
     u.root,
     (u.h + 0.45) / u.baseScale,
-    type === 'boss' ? 0 : Math.max(0.9, def.r * 2.2),
+    def.boss ? 0 : Math.max(0.9, def.r * 2.2),
     ally ? 'a' : 'e'
   );
-  u.blob = makeBlob(u.r * (type === 'boss' ? 1.5 : 1));
+  u.blob = makeBlob(u.r * (def.boss ? 1.5 : 1));
   u.blob.position.set(x, 0.032, z);
   actors.add(u.blob);
   u.root.position.set(x, 0, z);

@@ -57,12 +57,13 @@ let save = {
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY));
   if (s && typeof s === 'object') {
-    save.unlocked = clamp(s.unlocked | 0, 1, 3);
+    save.unlocked = clamp(s.unlocked | 0, 1, 99);
     save.gems = Math.max(0, s.gems | 0);
     save.mute = !!s.mute;
     if (s.vib === false) save.vib = false;
     if (s.up) for (const k of ['atk', 'hp', 'agi', 'gol']) save.up[k] = clamp(s.up[k] | 0, 0, 5);
-    if (Array.isArray(s.stars)) for (let i = 0; i < 3; i++) save.stars[i] = clamp(s.stars[i] | 0, 0, 3);
+    if (Array.isArray(s.stars))
+      for (let i = 0; i < Math.min(s.stars.length, 20); i++) save.stars[i] = clamp(s.stars[i] | 0, 0, 3);
   }
 } catch (e) {}
 function persist() {

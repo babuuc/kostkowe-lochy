@@ -2,6 +2,7 @@
    Pliki z folderu js/ są ładowane po kolei (zobacz index.html) i dzielą wspólne zmienne globalne. */
 'use strict';
 /* ================= walka ================= */
+const DASH_SPD = 26;
 let tokens = 0,
   maxTok = 2,
   slowmo = 0,
@@ -16,6 +17,18 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
     return true;
   }
   if (t.dead) return false;
+  if (t.bones > 0) {
+    // leżące kości: każde trafienie rozbija je na dobre
+    t.smashed = true;
+    debris.burst(t.x, 0.3, t.z, 0xe2ded0, 8, 4.5, 0.14, 0.8);
+    sfx.crystal();
+    die(t);
+    return true;
+  }
+  if (t.def.lich && lichImmune(t)) {
+    lichBlocked(t);
+    return false;
+  }
   if (t === hero) {
     if (ending) return false;
     if (hero.rollT > 0) {
@@ -85,7 +98,8 @@ function hurtNode(n, dmg, by) {
       sfx.shield();
       if (!shieldHint && by === 0) {
         shieldHint = true;
-        banner('Tarcza kryształu', 'Pęknie, gdy zostanie mniej niż trzech strażników.', 3.2);
+        const cnt = { 3: 'trzech', 4: 'czterech', 5: 'pięciu' }[level.shieldAt || 3];
+        banner('Tarcza kryształu', 'Pęknie, gdy zostanie mniej niż ' + cnt + ' strażników.', 3.2);
       }
     }
     return;
@@ -183,22 +197,54 @@ function spawnBoss(n) {
     x = n.x + 3.2;
     z = n.z;
   }
-  boss = makeUnit('boss', x, z, n);
+  boss = makeUnit(level.bossType || 'boss', x, z, n);
   boss.spawnT = boss.spawnDur = 1.4;
   boss.cd = 2.2;
-  lightSrc.push({ unit: boss, x, y: 3.2, z, color: COL_E, range: 12, int: 1.3, flick: true, ph: 0, d: 0 });
+  const bc = boss.def.lich ? LICH_C : COL_E;
+  // światło bossa wisi nad nim (u wysokiego Strażnika wyżej, żeby nie świeciło od środka modelu)
+  lightSrc.push({
+    unit: boss,
+    x,
+    y: boss.def.lich ? 6.2 : 3.2,
+    z,
+    color: bc,
+    range: boss.def.lich ? 14 : 12,
+    int: 1.3,
+    flick: true,
+    ph: 0,
+    d: 0,
+  });
   lightT = 0;
-  waveFx(x, z, 0.5, 6, COL_E, 1.2);
-  burst(x, 1, z, COL_E, 40, 8, 0.22, 1.2);
+  waveFx(x, z, 0.5, 6, bc, 1.2);
+  burst(x, 1, z, bc, 40, 8, 0.22, 1.2);
   decal(x, z, 3.2, 5);
   shake(0.9);
   sfx.boss();
-  banner('Strażnik Głębin', 'Unikaj czerwonych kręgów i bij, gdy się odsłoni.', 3.2);
+  const bossName = level.bossName || 'Strażnik Głębin';
+  banner(bossName, level.bossHint || 'Unikaj czerwonych kręgów i bij, gdy się odsłoni.', 3.6);
+  $('bossName').textContent = bossName;
+  hintQ = [];
+  hintT = 0;
   $('bosshp').hidden = false;
   refreshFields();
 }
 function die(u, silent) {
   if (u.dead) return;
+  // kościany wojownik rozpada się na kości i po chwili wstaje (najwyżej dwa razy), chyba że kości zostaną rozbite
+  if (u.def.revive && !silent && !u.smashed && (u.revives || 0) < 2) {
+    u.bones = 4.5;
+    u.hp = 1;
+    u.state = 'move';
+    u.stun = 0;
+    u.vx = u.vz = 0;
+    u.tgt = null;
+    setFlash(u, false);
+    setBar(u.bar, 0, false);
+    debris.burst(u.x, 0.8, u.z, 0xe2ded0, 6, 3.5, 0.12, 0.6);
+    burst(u.x, 0.5, u.z, LICH_C, 6, 1.5, 0.08, 1.2, -2);
+    sfx.die();
+    return;
+  }
   u.dead = true;
   anyDead = true;
   u.dieT = 0.16;
@@ -449,7 +495,7 @@ function beginWind(u, t) {
         }
       }
     u.healTgt = best;
-  }
+  } else if (u.def.dash) sfx.wail();
 }
 function explode(u) {
   const R = u.def.bomb;
@@ -503,6 +549,18 @@ function strike(u, t) {
         );
       }
     }
+  } else if (u.def.dash) {
+    // szarża upiora: stała długość po linii wyznaczonej na końcu zamachu
+    const dx = u.aimX - u.x,
+      dz = u.aimZ - u.z,
+      d = Math.hypot(dx, dz) || 1;
+    u.dashX = dx / d;
+    u.dashZ = dz / d;
+    u.dashT = u.def.dash / DASH_SPD;
+    u.dashHit = false;
+    u.lunge = 0;
+    burst(u.x, 0.9, u.z, 0x7fffd8, 10, 4, 0.12, 0.5, 0);
+    sfx.dash();
   } else if (u.def.bomb) {
     explode(u);
   } else if (u.def.heal) {
@@ -542,7 +600,8 @@ function strike(u, t) {
     if (t && alive(t, u)) {
       const d = Math.hypot(t.x - u.x, t.z - u.z);
       if (d <= u.def.range + t.r + 0.8) {
-        hurt(t, u.dmg, u.x, u.z, 5, false, u.team);
+        // golemy słabo ranią Strażnika Otchłani: walkę z nim musi wygrać bohater
+        hurt(t, t.def && t.def.lich && u.team === 0 ? u.dmg * 0.35 : u.dmg, u.x, u.z, 5, false, u.team);
         if (t.isNode || t.team === 1) sfx.hit();
       }
     }
@@ -562,6 +621,38 @@ function updateUnit(u, dt) {
   if (u.flash > 0) {
     u.flash -= dt;
     if (u.flash <= 0) setFlash(u, false);
+  }
+  if (u.def.lich) {
+    updateLich(u, dt);
+    animUnit(u, dt);
+    return;
+  }
+  if (u.bones > 0) {
+    u.bones -= dt;
+    if (Math.random() < 0.08) burst(u.x, 0.3, u.z, LICH_C, 1, 0.5, 0.07, 1.0, -2);
+    if (u.bones <= 0) {
+      u.bones = 0;
+      u.revives = (u.revives || 0) + 1;
+      u.hp = Math.round(u.maxHp * 0.6);
+      u.barT = 3;
+      u.pop = 1;
+      u.cd = 0.8;
+      burst(u.x, 0.6, u.z, LICH_C, 14, 3.5, 0.12, 0.7, -2);
+      waveFx(u.x, u.z, 0.2, 1.4, LICH_C, 0.4);
+      sfx.spawn();
+    }
+    animUnit(u, dt);
+    return;
+  }
+  if (u.dashT > 0) {
+    u.dashT -= dt;
+    moveCircle(u, u.dashX * DASH_SPD * dt, u.dashZ * DASH_SPD * dt);
+    u.face = Math.atan2(u.dashX, u.dashZ);
+    if (Math.random() < 0.8) burst(u.x, 0.9, u.z, 0x7fffd8, 1, 0.6, 0.12, 0.35, 0);
+    if (!u.dashHit && !hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < u.r + hero.r + 0.25)
+      if (hurt(hero, u.dmg, u.x - u.dashX, u.z - u.dashZ, 9)) u.dashHit = true;
+    animUnit(u, dt);
+    return;
   }
   let mx = 0,
     mz = 0,
@@ -587,6 +678,13 @@ function updateUnit(u, dt) {
       }
       faceTo = Math.atan2(u.aimX - u.x, u.aimZ - u.z);
       if (u.def.ranged && !u.healTgt && !u.def.heal) aimLine(u.x, u.z, u.aimX, u.aimZ, 1 - u.t / u.windDur);
+      if (u.def.dash) {
+        const dx = u.aimX - u.x,
+          dz = u.aimZ - u.z,
+          d = Math.hypot(dx, dz) || 1,
+          k = 1 - u.t / u.windDur;
+        aimLine(u.x, u.z, u.x + (dx / d) * u.def.dash, u.z + (dz / d) * u.def.dash, k, 0.5 + k * 0.5, 0.07);
+      }
       if (u.def.bomb && Math.floor(u.t * 14) % 2 === 0) setFlash(u, true);
       else if (u.def.bomb && u.flash <= 0) setFlash(u, false);
       if (u.t <= 0) {
@@ -731,7 +829,31 @@ function animUnit(u, dt) {
       ey = P.eyes;
     for (let i = 0; i < ey.length; i++) ey[i].scale.y = bs;
   }
-  if (P.core) {
+  if (P.lich) {
+    sc *= animLich(u, dt).s;
+    lean = -u.pop * 0.1;
+  } else if (P.wraith) {
+    const dash = u.dashT > 0;
+    let ax = -0.35,
+      lb = u.lean + mv * 0.25;
+    if (wind) {
+      ax = -2.5 * Math.min(1, wk * 1.5);
+      lb = u.lean - 0.3 * wk;
+    } else if (dash) {
+      ax = -1.3;
+      lb = 0.9;
+    } else if (rec) {
+      ax = -0.6;
+      lb = u.lean + 0.1;
+    }
+    P.body.position.y = 0.35 + Math.sin(time * 2.4 + u.seed) * 0.12;
+    P.armL.rotation.x = damp(P.armL.rotation.x, ax + Math.sin(time * 3 + u.seed) * 0.12, 14, dt);
+    P.armR.rotation.x = damp(P.armR.rotation.x, ax + Math.sin(time * 3 + u.seed + 1) * 0.12, 14, dt);
+    P.body.rotation.x = damp(P.body.rotation.x, lb, dash ? 30 : 10, dt);
+    P.tail.rotation.x = damp(P.tail.rotation.x, 0.2 + mv * 0.5 + (dash ? 0.9 : 0), 8, dt);
+    P.head.rotation.y = wind || dash ? 0 : Math.sin(time * 0.9 + u.seed) * 0.3 * (1 - mv);
+    lean = -u.pop * 0.22;
+  } else if (P.core) {
     const bomb = u.type === 'bomber';
     u.phase += dt * (mv > 0.05 ? (bomb ? 14 : 9) : 3);
     const b = P.body,
@@ -889,11 +1011,17 @@ function animUnit(u, dt) {
     }
     lean = -u.pop * 0.22;
   }
+  if (u.bones > 0) {
+    // leży jako stos kości; tuż przed wstaniem drży
+    lean = -1.45;
+    y = -0.15;
+    roll = u.bones < 1.2 ? Math.sin(time * 40) * 0.12 : 0;
+  }
   root.position.set(u.x + Math.sin(u.face) * u.lunge, y, u.z + Math.cos(u.face) * u.lunge);
   root.rotation.set(lean, u.face, roll);
   const px = 1 + u.pop * 0.16;
   root.scale.set(sc * px, sc * (1 - u.pop * 0.12), sc * px);
   u.blob.position.set(u.x, 0.032, u.z);
-  const showBar = (u.barT > 0 || u.elite) && u.hp < u.maxHp && !u.def.boss;
+  const showBar = (u.barT > 0 || u.elite) && u.hp < u.maxHp && !u.def.boss && !(u.bones > 0);
   setBar(u.bar, u.hp / u.maxHp, showBar);
 }

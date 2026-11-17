@@ -72,7 +72,12 @@ function updateHud(dt) {
       el.style.setProperty('--cd', v);
     }
   }
-  if (boss) $('bossfill').style.width = (clamp(boss.hp / boss.maxHp, 0, 1) * 100).toFixed(1) + '%';
+  if (boss) {
+    $('bossfill').style.width = (clamp(boss.hp / boss.maxHp, 0, 1) * 100).toFixed(1) + '%';
+    const bh = $('bosshp');
+    bh.classList.toggle('phased', !!boss.def.lich);
+    bh.classList.toggle('shielded', !!(boss.def.lich && lichImmune(boss)));
+  }
   if (banT > 0) {
     banT -= dt;
     if (banT <= 0) $('banner').classList.remove('show');
@@ -199,7 +204,11 @@ function hint(list) {
 }
 
 /* ================= przepływ gry ================= */
-let selIdx = Math.min(save.unlocked, 3) - 1;
+// etapy z zapisu: odblokuj kolejny po każdym zdobytym (np. czwarty dla graczy, którzy przeszli trzeci przed jego dodaniem)
+while (save.stars.length < LEVELS.length) save.stars.push(0);
+for (let i = 0; i < LEVELS.length; i++) if (save.stars[i] > 0) save.unlocked = Math.max(save.unlocked, i + 2);
+save.unlocked = clamp(save.unlocked, 1, LEVELS.length);
+let selIdx = save.unlocked - 1;
 const UPG = [
   { k: 'atk', name: 'Ostrze', desc: '+15% obrażeń' },
   { k: 'hp', name: 'Serce', desc: '+20 zdrowia' },
@@ -300,6 +309,7 @@ function renderMenu() {
   renderFs();
 }
 function startLevel(i) {
+  camZoom = 1;
   buildWorld(i);
   resetHero();
   state = 'play';
@@ -339,12 +349,7 @@ function startLevel(i) {
           'Kryształ chroni tarcza, dopóki żyje trzech strażników.',
           'Unik tuż przed ciosem wroga daje pewne trafienie krytyczne.',
         ])
-      : i === 1
-        ? [
-            'Wróg wysyła wypady na twoje kapliczki. Atak miga na mapie w rogu.',
-            'Szaman leczy strażników. Zdejmij go pierwszego.',
-          ]
-        : ['Elity świecą na fioletowo i biją mocniej, ale gubią więcej odłamków.']
+      : LEVELS[i].hints || []
   );
 }
 function toMenu() {
@@ -353,7 +358,7 @@ function toMenu() {
   hero.root.visible = false;
   hero.blob.visible = false;
   hero.ring.visible = false;
-  selIdx = Math.min(selIdx, 2);
+  selIdx = Math.min(selIdx, LEVELS.length - 1);
   buildWorld(selIdx);
   $('hud').hidden = true;
   $('result').hidden = true;
@@ -389,7 +394,7 @@ function finish(kind) {
     save.gems += bonus;
     runGems += bonus;
     save.stars[levelIdx] = Math.max(save.stars[levelIdx], stars);
-    save.unlocked = Math.max(save.unlocked, Math.min(3, levelIdx + 2));
+    save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, levelIdx + 2));
     persist();
     const next = levelIdx < LEVELS.length - 1;
     $('resH').textContent = next ? 'Etap ukończony' : 'Lochy oczyszczone';

@@ -177,6 +177,8 @@ let lightSrc = [],
   glowers = [],
   corpses = [];
 function clearWorld() {
+  resetBossFx();
+  cryptReset();
   for (let i = world.children.length - 1; i >= 0; i--) {
     const o = world.children[i];
     world.remove(o);
@@ -321,16 +323,18 @@ function buildWorld(idx) {
   function brazier(x, z) {
     db.add(x, 0.3, z, 0.56, 0.6, 0.56, shade(TH.stone, -0.12));
     db.add(x, 0.68, z, 0.86, 0.18, 0.86, shade(TH.stone, -0.04));
-    eb.add(x, 0.88, z, 0.5, 0.24, 0.5, 0xff8a2a);
-    eb.add(x, 1.1, z, 0.3, 0.24, 0.3, 0xffc040);
-    eb.add(x, 1.3, z, 0.14, 0.2, 0.14, 0xfff0a0);
-    addLight(x, 1.15, z, 0xff9a40, 9, 1.15, 3.4);
+    const F = TH.fire || { a: 0xff8a2a, b: 0xffc040, c: 0xfff0a0, l: 0xff9a40 };
+    eb.add(x, 0.88, z, 0.5, 0.24, 0.5, F.a);
+    eb.add(x, 1.1, z, 0.3, 0.24, 0.3, F.b);
+    eb.add(x, 1.3, z, 0.14, 0.2, 0.14, F.c);
+    addLight(x, 1.15, z, F.l, 9, 1.15, 3.4);
   }
   function lantern(x, y, z) {
     db.add(x, y + 0.02, z, 0.28, 0.06, 0.28, 0x2a2620);
-    eb.add(x, y + 0.17, z, 0.2, 0.24, 0.2, 0xffc860);
+    const Lm = TH.lamp || { c: 0xffc860, l: 0xffb45a };
+    eb.add(x, y + 0.17, z, 0.2, 0.24, 0.2, Lm.c);
     db.add(x, y + 0.32, z, 0.28, 0.06, 0.28, 0x2a2620);
-    addLight(x, y + 0.17, z, 0xffb45a, 7.5, 0.9, 2.4);
+    addLight(x, y + 0.17, z, Lm.l, 7.5, 0.9, 2.4);
   }
   // murki i skały na dalszej krawędzi wysp (tło, nie zasłania bohatera)
   const rims = [];
@@ -367,6 +371,19 @@ function buildWorld(idx) {
         if (rng() < 0.5) db.add(x, 2.2, z, 1.0, 0.2, 1.0, jit(TH.rimTop));
         else db.add(x + 0.15, 2.25, z, 0.4, 0.3, 0.5, jit(TH.rim));
       } else if (rng() < 0.25) db.add(x, 1.3, z, 0.5, 0.44, 0.5, 0xb5653a);
+    } else if (key === 'crypt') {
+      const h = (tall ? 1.9 : 1.0) + rng() * 0.6;
+      db.add(x, h / 2, z, 1, h, 1, jit(TH.rim, 0.03));
+      db.add(x, h + 0.07, z, 1.06, 0.14, 1.06, jit(TH.rimTop, 0.03));
+      if (rng() < 0.3) db.add(x - 0.2, h + 0.2, z + 0.1, 0.4, 0.14, 0.5, jit(TH.rim, 0.03));
+      if (rng() < 0.35) db.add(x + (rng() - 0.5) * 0.5, h * 0.4, z + 0.51, 0.34, 0.3, 0.02, 0x2f4a3c);
+      if (!tall && rng() < 0.3) {
+        for (let k = -1; k <= 1; k++) db.add(x + k * 0.3, h + 0.45, z, 0.06, 0.7, 0.06, 0x15181b);
+        db.add(x, h + 0.62, z, 0.96, 0.05, 0.06, 0x15181b);
+      } else if (rng() < 0.25) {
+        db.add(x + 0.2, h + 0.2, z, 0.12, 0.26, 0.12, 0xd8d2c0);
+        eb.add(x + 0.2, h + 0.39, z, 0.06, 0.1, 0.06, TH.fire.b);
+      }
     } else {
       const h = (tall ? 2.0 : 0.9) + rng() * 1.0;
       db.add(x, h / 2, z, 0.98, h, 0.98, jit(TH.rim, 0.03));
@@ -453,6 +470,46 @@ function buildWorld(idx) {
         db.add(x, 0.95, z, 0.5, 0.3, 0.5, 0xb28e58, ry);
         db.add(x, 0.3, z, 0.3, 0.6, 0.52, 0x9a7a48, ry);
       } else brazier(x, z);
+    } else if (key === 'crypt') {
+      if (r < 0.3) {
+        const ry = (rng() - 0.5) * 0.5,
+          gs = jit(0x6a7078, 0.04);
+        db.add(x, 0.07, z, 0.9, 0.14, 0.7, jit(0x4a5056, 0.03), ry);
+        if (rng() < 0.6) {
+          db.add(x, 0.55, z - 0.1, 0.66, 0.84, 0.18, gs, ry);
+          db.add(x, 1.0, z - 0.1, 0.46, 0.12, 0.18, gs, ry);
+          db.add(x, 0.6, z - 0.0, 0.3, 0.06, 0.02, 0x2a2e33, ry);
+        } else {
+          db.add(x, 0.65, z - 0.1, 0.2, 1.1, 0.18, gs, ry);
+          db.add(x, 0.85, z - 0.1, 0.7, 0.18, 0.18, gs, ry);
+        }
+        if (rng() < 0.5) db.add(x + 0.2, 0.16, z + 0.2, 0.36, 0.05, 0.3, 0x2f4a3c);
+      } else if (r < 0.5) {
+        const th = 1.6 + rng() * 0.8,
+          tc = 0x2a2420;
+        db.add(x, 0.1, z, 0.6, 0.2, 0.6, shade(tc, -0.04));
+        db.add(x, th / 2, z, 0.34, th, 0.34, tc);
+        db.add(x + 0.4, th * 0.62, z, 0.62, 0.1, 0.1, tc);
+        db.add(x + 0.68, th * 0.62 + 0.22, z, 0.1, 0.44, 0.1, tc);
+        db.add(x - 0.1, th * 0.82, z + 0.36, 0.1, 0.1, 0.6, tc);
+        db.add(x - 0.1, th * 0.82 + 0.2, z + 0.62, 0.08, 0.36, 0.08, tc);
+        db.add(x - 0.36, th * 0.5, z - 0.1, 0.5, 0.08, 0.08, tc);
+        db.add(x + 0.06, th + 0.18, z, 0.08, 0.36, 0.08, tc);
+      } else if (r < 0.68) brazier(x, z);
+      else if (r < 0.85) {
+        const h = 1.4 + rng() * 1.4,
+          st = jit(0x575e66, 0.03);
+        db.add(x, 0.12, z, 0.86, 0.24, 0.86, shade(st, -0.05));
+        db.add(x, h / 2 + 0.2, z, 0.56, h, 0.56, st);
+        if (rng() < 0.5) db.add(x, h + 0.3, z, 0.8, 0.2, 0.8, shade(st, 0.03));
+        else db.add(x + 0.5, 0.18, z + 0.3, 0.5, 0.36, 0.5, st, 0.6);
+      } else {
+        const ry = rng() < 0.5 ? 0 : Math.PI / 2;
+        db.add(x, 0.26, z, 1.0, 0.52, 0.62, jit(0x4f565e, 0.03), ry);
+        db.add(x, 0.58, z, 1.08, 0.12, 0.7, jit(0x5f666e, 0.03), ry);
+        db.add(x, 0.66, z, ry ? 0.1 : 0.6, 0.04, ry ? 0.6 : 0.1, 0x2a2e33, ry);
+        db.add(x, 0.66, z, ry ? 0.42 : 0.1, 0.04, ry ? 0.1 : 0.42, 0x2a2e33, ry);
+      }
     } else {
       if (r < 0.45) {
         const h = 0.8 + rng() * 1.7;
@@ -509,6 +566,18 @@ function buildWorld(idx) {
         db.add(x, 0.16, z, 0.3, 0.32, 0.3, 0xb5653a);
         db.add(x, 0.34, z, 0.22, 0.06, 0.22, 0x8a4a28);
       }
+    } else if (key === 'crypt') {
+      if (r < 0.32) {
+        fb.add(x, 0.12, z, 0.08, 0.24, 0.08, 0x2f4a3c);
+        fb.add(x + 0.13, 0.09, z + 0.08, 0.07, 0.18, 0.07, 0x37554a);
+      } else if (r < 0.62) db.add(x, 0.04, z, 0.5, 0.07, 0.09, 0xd8d2c0, rng() * 3);
+      else if (r < 0.8) {
+        db.add(x, 0.11, z, 0.22, 0.2, 0.22, 0xd8d2c0);
+        db.add(x, 0.13, z + 0.111, 0.14, 0.06, 0.02, 0x15181b);
+      } else {
+        db.add(x, 0.07, z, 0.05, 0.14, 0.05, 0xc8d8d0);
+        eb.add(x, 0.17, z, 0.16, 0.07, 0.16, TH.fire.a);
+      }
     } else {
       if (r < 0.5) eb.add(x, 0.012, z, 0.5 + rng() * 0.5, 0.022, 0.09, 0xff7a2a, rng() * 3);
       else if (r < 0.88) db.add(x, 0.07, z, 0.28, 0.14, 0.24, 0x221f26, rng() * 3);
@@ -549,6 +618,7 @@ function buildWorld(idx) {
       scatter(x, z);
     }
   }
+  if (key === 'crypt') cryptBuild(L, rng, pathM, linkD, db);
   for (const n of L.nodes) {
     const ci = n.x | 0,
       cj = n.z | 0;
@@ -674,7 +744,20 @@ function buildWorld(idx) {
         jit(0x6a4630),
         rng() * 3
       );
-    else
+    else if (key === 'crypt') {
+      if (rng() < 0.12) eb.add(x, TH.underY + 0.06, z, 0.24, 0.05, 0.24, TH.fire.a, rng() * 3);
+      else
+        wb.add(
+          x,
+          TH.underY + 0.08,
+          z,
+          0.6 + rng() * 1.4,
+          0.14,
+          0.5 + rng() * 1.2,
+          jit(0x0e1a1e, 0.02),
+          rng() * 3
+        );
+    } else
       wb.add(
         x,
         TH.underY + 0.07,
@@ -743,7 +826,7 @@ function buildWorld(idx) {
     bfs(n.field, nodeCells(n));
     if (n.own === 1) for (let k = 0; k < n.cap; k++) spawnFromNode(n, true);
   }
-  for (const n of nodes) n.shield = n.own === 1 && n.kids >= 3;
+  for (const n of nodes) n.shield = n.own === 1 && n.kids >= (level.shieldAt || 3);
   refreshFields();
   lightT = 0;
 }

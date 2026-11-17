@@ -160,7 +160,7 @@ function waveFx(x, z, r0, r1, color, dur) {
 // ostrzeżenia przed uderzeniem
 const DISC_GEO = new THREE.CircleGeometry(1, 40);
 const teles = [];
-for (let i = 0; i < 6; i++) {
+for (let i = 0; i < 16; i++) {
   const ma = new THREE.MeshBasicMaterial({
       color: 0xff3040,
       transparent: true,
@@ -326,7 +326,7 @@ function trailUpdate(dt) {
 }
 // linie celowania łuczników
 const aimLines = [];
-for (let i = 0; i < 6; i++) {
+for (let i = 0; i < 12; i++) {
   const mt = new THREE.MeshBasicMaterial({
     color: 0xff4040,
     transparent: true,
@@ -343,16 +343,16 @@ function aimReset() {
   for (let i = 0; i < aimI; i++) aimLines[i].m.visible = false;
   aimI = 0;
 }
-function aimLine(x0, z0, x1, z1, k) {
-  if (aimI >= 6) return;
+function aimLine(x0, z0, x1, z1, k, w, y) {
+  if (aimI >= aimLines.length) return;
   const a = aimLines[aimI++],
     dx = x1 - x0,
     dz = z1 - z0,
     d = Math.hypot(dx, dz);
   a.m.visible = true;
-  a.m.position.set((x0 + x1) / 2, 1.0, (z0 + z1) / 2);
+  a.m.position.set((x0 + x1) / 2, y === undefined ? 1.0 : y, (z0 + z1) / 2);
   a.m.rotation.y = Math.atan2(dx, dz);
-  a.m.scale.set(0.03 + k * 0.05, 0.03, d);
+  a.m.scale.set(w === undefined ? 0.03 + k * 0.05 : w, 0.03, d);
   a.mt.opacity = 0.12 + k * 0.5;
 }
 // cienie chmur
@@ -375,6 +375,27 @@ for (let i = 0; i < 3; i++) {
   m.renderOrder = 5;
   fxG.add(m);
   clouds.push({ m, x: G / 2 + (i - 1) * 34, z: G / 2 + (i - 1) * -22 });
+}
+// mgła nad otchłanią (etap krypt): przesuwa się nisko nad wodą, wyspy ją zasłaniają
+const mists = [];
+for (let i = 0; i < 5; i++) {
+  const m = new THREE.Mesh(
+    POOL_GEO,
+    new THREE.MeshBasicMaterial({
+      map: glowTex,
+      color: 0x5fc8b8,
+      transparent: true,
+      opacity: 0.1,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.scale.set(26 + i * 5, 16 + i * 3, 1);
+  m.visible = false;
+  fxG.add(m);
+  mists.push({ m, x: G / 2 + (i - 2) * 14, z: G / 2 + (((i * 37) % 5) - 2) * 10, s: 0.6 + i * 0.15 });
 }
 // liczby obrażeń
 const dmgEls = [];
@@ -469,7 +490,7 @@ function updatePickups(dt) {
     const dx = hero.x - p.x,
       dz = hero.z - p.z,
       d = Math.hypot(dx, dz);
-    if (p.t > 0.45 && d < 3.6 && !hero.dead) {
+    if (p.t > 0.45 && (d < 3.6 || p.t > 25) && !hero.dead) {
       const s = Math.min(18, 6 + p.t * 14);
       p.x += (dx / d) * s * dt;
       p.z += (dz / d) * s * dt;
@@ -526,16 +547,17 @@ function healHero(v) {
 const projPool = [],
   arrowMat = mat(0xefe4c4),
   arrowMatE = mat(0xd8d4c0, 0x40181c),
-  orbMat = mat(COL_E, COL_E);
+  orbMat = mat(COL_E, COL_E),
+  soulMat = mat(0xa0fff0, 0x2fd8b0);
 function shoot(x, z, dx, dz, speed, team, dmg, kind) {
   let m = projPool.pop();
   if (!m) {
     m = new THREE.Mesh(BOX, arrowMat);
     fxG.add(m);
   }
-  if (kind === 'orb') {
-    m.material = orbMat;
-    m.scale.set(0.36, 0.36, 0.36);
+  if (kind === 'orb' || kind === 'soul') {
+    m.material = kind === 'soul' ? soulMat : orbMat;
+    m.scale.setScalar(kind === 'soul' ? 0.42 : 0.36);
   } else {
     m.material = team === 0 ? arrowMat : arrowMatE;
     m.scale.set(0.08, 0.08, 0.8);
@@ -547,7 +569,7 @@ function shoot(x, z, dx, dz, speed, team, dmg, kind) {
     z,
     vx: dx * speed,
     vz: dz * speed,
-    life: kind === 'orb' ? 3.2 : 1.4,
+    life: kind === 'orb' || kind === 'soul' ? 3.4 : 1.4,
     team,
     dmg,
     kind: kind || 'arrow',
@@ -567,16 +589,17 @@ function updateProjs(dt) {
     }
     if (!gone) {
       if (p.team === 0) {
-        for (const u of units) {
-          if (u.team !== 1 || u.dead) continue;
-          if (Math.hypot(u.x - p.x, u.z - p.z) < u.r + 0.3) {
-            hurt(u, p.dmg, p.x - p.vx, p.z - p.vz, 5, false);
-            addCombo(1);
-            sfx.hit();
-            gone = true;
-            break;
+        if (smashUrns(p.x, p.z, 0.15)) gone = true;
+        if (!gone)
+          for (const u of units) {
+            if (u.team !== 1 || u.dead) continue;
+            if (Math.hypot(u.x - p.x, u.z - p.z) < u.r + 0.3) {
+              if (hurt(u, p.dmg, p.x - p.vx, p.z - p.vz, 5, false)) addCombo(1);
+              sfx.hit();
+              gone = true;
+              break;
+            }
           }
-        }
         if (!gone)
           for (const n of nodes) {
             if (n.own === 1 && Math.hypot(n.x - p.x, n.z - p.z) < n.r + 0.1) {
@@ -608,10 +631,11 @@ function updateProjs(dt) {
       projs.splice(i, 1);
     } else {
       p.m.position.set(p.x, 1.0, p.z);
-      if (p.kind === 'orb') {
+      if (p.kind === 'orb' || p.kind === 'soul') {
         p.m.rotation.x += dt * 8;
         p.m.rotation.y += dt * 6;
-        if (Math.random() < 0.5) burst(p.x, 1, p.z, COL_E, 1, 0.6, 0.1, 0.3, 0);
+        if (Math.random() < 0.5)
+          burst(p.x, 1, p.z, p.kind === 'soul' ? 0x7fffd8 : COL_E, 1, 0.6, 0.1, 0.3, 0);
       } else if (Math.random() < 0.7)
         burst(p.x, 1, p.z, p.team === 0 ? 0xfff2c0 : 0xff9080, 1, 0.3, 0.06, 0.22, 0);
     }
