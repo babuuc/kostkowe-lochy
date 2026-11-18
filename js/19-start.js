@@ -63,6 +63,7 @@ function frame(now) {
       console.error(e);
     }
   }
+  updateDark(dt);
   if (state === 'play') updateHud(dt);
   if (state === 'play' || state === 'menu') music(dt);
 }

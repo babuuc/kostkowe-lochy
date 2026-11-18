@@ -604,8 +604,8 @@ function projDraw() {
       projArrow.setColorAt(na, tmpC.setHex(p.team === 0 ? (p.crit ? 0xffe08a : 0xefe4c4) : 0xe8b0a8));
       na++;
     } else {
-      const s = p.kind === 'soul' ? 0.3 : 0.24,
-        c = p.kind === 'soul' ? 0xc8fff2 : 0xe0a0ff;
+      const s = p.kind === 'orb' ? 0.24 : 0.3,
+        c = p.kind === 'soul' ? 0xc8fff2 : p.kind === 'blade' ? 0xffc0b0 : 0xe0a0ff;
       dummy.rotation.set(p.spin, p.spin * 0.7, 0);
       dummy.scale.set(s, s * 1.3, s);
       dummy.updateMatrix();
@@ -614,7 +614,10 @@ function projDraw() {
       dummy.scale.set(s * 2.1, s * 2.1, s * 2.1);
       dummy.updateMatrix();
       projHalo.setMatrixAt(no, dummy.matrix);
-      projHalo.setColorAt(no, tmpC.setHex(p.kind === 'soul' ? LICH_C : COL_E));
+      projHalo.setColorAt(
+        no,
+        tmpC.setHex(p.kind === 'soul' ? LICH_C : p.kind === 'blade' ? PRINCE_C : COL_E)
+      );
       no++;
     }
   }
@@ -685,7 +688,17 @@ function updateProjs(dt) {
     else if (p.kind === 'arrow') {
       if (Math.random() < 0.6) burst(p.x, 1, p.z, p.team === 0 ? 0xfff2c0 : 0xff9080, 1, 0.3, 0.06, 0.22, 0);
     } else if (Math.random() < (projs.length > 40 ? 0.15 : 0.4))
-      burst(p.x, 1, p.z, p.kind === 'soul' ? 0x7fffd8 : COL_E, 1, 0.6, 0.1, 0.3, 0);
+      burst(
+        p.x,
+        1,
+        p.z,
+        p.kind === 'soul' ? 0x7fffd8 : p.kind === 'blade' ? 0xff6070 : COL_E,
+        1,
+        0.6,
+        0.1,
+        0.3,
+        0
+      );
   }
   projDraw();
 }

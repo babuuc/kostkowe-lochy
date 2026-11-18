@@ -25,6 +25,26 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
     die(t);
     return true;
   }
+  if (t.def.prince && princeImmune(t)) {
+    lichBlocked(t);
+    return false;
+  }
+  // rycerz mroku blokuje tarczą ciosy z przodu (krytyki, wir i grom przebijają tarczę)
+  if (
+    t.def.guard &&
+    !crit &&
+    fx !== undefined &&
+    Math.abs(angDiff(t.face, Math.atan2(fx - t.x, fz - t.z))) < 1.05
+  ) {
+    dmg *= 0.2;
+    kb = (kb || 0) * 0.3;
+    if (time - (t.blockT || 0) > 0.3) {
+      t.blockT = time;
+      dmgNum(t.x, t.h + 0.5, t.z, 'blok', 'ally');
+      burst(t.x + Math.sin(t.face) * 0.5, 1, t.z + Math.cos(t.face) * 0.5, 0xffe0a0, 6, 4, 0.08, 0.25);
+      sfx.block();
+    }
+  }
   if (t.def.lich && lichImmune(t)) {
     lichBlocked(t);
     return false;
@@ -198,6 +218,8 @@ function loseNode(n) {
 }
 function spawnBoss(n) {
   bossSpawned = true;
+  // niektóre etapy mają stałą arenę bossa
+  if (level.bossNode !== undefined) n = nodes[level.bossNode];
   let dx = n.x - hero.x,
     dz = n.z - hero.z,
     d = Math.hypot(dx, dz) || 1;
@@ -210,12 +232,12 @@ function spawnBoss(n) {
   boss = makeUnit(level.bossType || 'boss', x, z, n);
   boss.spawnT = boss.spawnDur = 1.4;
   boss.cd = 2.2;
-  const bc = boss.def.lich ? LICH_C : COL_E;
+  const bc = boss.def.lich ? LICH_C : boss.def.prince ? PRINCE_C : COL_E;
   // światło bossa wisi nad nim (u wysokiego Strażnika wyżej, żeby nie świeciło od środka modelu)
   lightSrc.push({
     unit: boss,
     x,
-    y: boss.def.lich ? 6.2 : 3.2,
+    y: boss.def.lich ? 6.2 : boss.def.prince ? 7.5 : 3.2,
     z,
     color: bc,
     range: boss.def.lich ? 14 : 12,
@@ -283,6 +305,13 @@ function die(u, silent) {
     }
   }
   if (!silent) sfx.die();
+  if (u.def.prince) {
+    burst(u.x, 3, u.z, PRINCE_C, 90, 11, 0.22, 2.4, -4);
+    burst(u.x, 1.4, u.z, 0xffe0c0, 36, 13, 0.14, 0.9);
+    waveFx(u.x, u.z, 1, 12, PRINCE_C, 1.2);
+    flash(u.x, 3, u.z, 0xffc0b0, 4.5, 1.4, 24);
+    princeClear();
+  }
   if (u.def.lich) {
     // dusze uwalniają się z rozbitego Strażnika
     burst(u.x, 2.5, u.z, LICH_C, 70, 9, 0.2, 2.2, -5);
@@ -408,7 +437,7 @@ function refreshEnemyField() {
       const cs = nodeCells(n);
       for (let k = 0; k < cs.length; k++) src.push(cs[k]);
     }
-  if (boss && !boss.dead && !boss.def.lich) src.push(cellOf(boss.x, boss.z));
+  if (boss && !boss.dead && !boss.def.lich && !boss.def.prince) src.push(cellOf(boss.x, boss.z));
   bfs(fieldEnemy, src);
 }
 function refreshFields() {
@@ -628,7 +657,15 @@ function strike(u, t) {
       const d = Math.hypot(t.x - u.x, t.z - u.z);
       if (d <= u.def.range + t.r + 0.8) {
         // golemy słabo ranią Strażnika Otchłani: walkę z nim musi wygrać bohater
-        hurt(t, t.def && t.def.lich && u.team === 0 ? u.dmg * 0.35 : u.dmg, u.x, u.z, 5, false, u.team);
+        hurt(
+          t,
+          t.def && (t.def.lich || t.def.prince) && u.team === 0 ? u.dmg * 0.35 : u.dmg,
+          u.x,
+          u.z,
+          5,
+          false,
+          u.team
+        );
         if (t.isNode || t.team === 1) sfx.hit();
       }
     }
@@ -663,6 +700,11 @@ function updateUnit(u, dt) {
     u.vx = u.vz = 0;
     u.state = 'move';
     animUnit(u, 0);
+    return;
+  }
+  if (u.def.prince) {
+    updatePrince(u, dt);
+    animUnit(u, dt);
     return;
   }
   if (u.def.lich) {
@@ -845,7 +887,8 @@ function updateUnit(u, dt) {
     if (u.wgo && u.x === ox && u.z === oz) u.wgo = false;
   }
   if (faceTo === null && (mx || mz)) faceTo = Math.atan2(mx, mz);
-  if (faceTo !== null) u.face = angLerp(u.face, faceTo, 1 - Math.exp(-10 * dt));
+  // rycerze obracają się wolno, więc da się ich zajść z boku
+  if (faceTo !== null) u.face = angLerp(u.face, faceTo, 1 - Math.exp(-(u.def.guard ? 3.2 : 10) * dt));
   animUnit(u, dt);
 }
 function animUnit(u, dt) {
@@ -879,7 +922,12 @@ function animUnit(u, dt) {
       ey = P.eyes;
     for (let i = 0; i < ey.length; i++) ey[i].scale.y = bs;
   }
-  if (P.lich) {
+  if (P.prince) {
+    const o = animPrince(u, dt);
+    sc *= o.s;
+    y += o.y;
+    lean = -u.pop * 0.08;
+  } else if (P.lich) {
     sc *= animLich(u, dt).s;
     lean = -u.pop * 0.1;
   } else if (P.wraith) {
@@ -967,6 +1015,11 @@ function animUnit(u, dt) {
       el = -0.5;
       sr = -sn * 0.45 * mv;
       er = -0.35;
+    } else if (ty === 'knight') {
+      sl = -1.0;
+      el = -0.5;
+      sr = -0.4 + sn * 0.25 * mv;
+      er = -0.6;
     } else if (ty === 'shaman') {
       sr = -0.5;
       er = -0.65;

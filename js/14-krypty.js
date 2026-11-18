@@ -137,7 +137,7 @@ function drawUrn(u, k) {
   dummy.scale.set(0.14, 0.06, 0.14);
   dummy.updateMatrix();
   urnGlow.setMatrixAt(k, dummy.matrix);
-  urnGlow.setColorAt(k, tmpC.setHex(LICH_C));
+  urnGlow.setColorAt(k, tmpC.setHex(theme.urnC || LICH_C));
 }
 
 // Kolce: 2 s spokoju, 0,75 s czerwonego ostrzeżenia, pół sekundy w górze. Ranią każdego, kto stoi na płycie.
@@ -224,7 +224,7 @@ function smashUrns(x, z, r, face, arc) {
     urnMesh.instanceMatrix.needsUpdate = true;
     urnGlow.instanceMatrix.needsUpdate = true;
     debris.burst(u.x, 0.4, u.z, 0x55606a, 7, 4.5, 0.16, 0.8);
-    burst(u.x, 0.6, u.z, LICH_C, 10, 3, 0.1, 0.8, -3);
+    burst(u.x, 0.6, u.z, theme.urnC || LICH_C, 10, 3, 0.1, 0.8, -3);
     sfx.crystal();
     const g = 2 + ((Math.random() * 3) | 0);
     for (let i = 0; i < g; i++) dropGem(u.x, u.z);

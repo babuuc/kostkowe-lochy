@@ -127,6 +127,29 @@ const STAT_GROUPS = [
     ],
   },
   {
+    name: 'Mrok',
+    rows: [
+      [
+        'Widoczność w mroku',
+        S => fnum(S.sight, 1) + ' m',
+        'Jak daleko widzisz w ciemnych etapach, takich jak Cytadela Mroku.',
+        'Peleryna świetlików',
+      ],
+      [
+        'Oczy wrogów',
+        S => (S.eyes ? 'tak' : '—'),
+        'Wrogowie poza polem widzenia zdradzają się świecącymi oczami.',
+        'Peleryna świetlików (poziom 4)',
+      ],
+      [
+        'Rozbłysk peleryny',
+        S => (S.flare ? 'co 8 s' : '—'),
+        'Peleryna co jakiś czas rozbłyska i na chwilę rozświetla okolicę.',
+        'Peleryna świetlików (poziom 8)',
+      ],
+    ],
+  },
+  {
     name: 'Golemy',
     rows: [
       ['Siła golemów', S => pct(S.golem), 'Zdrowie i obrażenia golemów z przejętych kapliczek.', 'Golemy'],

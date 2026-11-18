@@ -189,7 +189,7 @@ function updateLights(dt) {
     if (s.node) {
       Lt.color.setHex(s.node.own === 0 ? COL_P : COL_E);
       // w kryptach przejęte kapliczki rozświetlają mrok mocniej
-      const lit = s.node.own === 0 && theme.key === 'crypt';
+      const lit = s.node.own === 0 && (theme.key === 'crypt' || theme.dark);
       Lt.intensity = s.int * mul * fade * (1 + s.node.pulse * 0.6) * (lit ? 1.5 : 1);
     } else {
       Lt.color.setHex(s.color);
@@ -199,7 +199,8 @@ function updateLights(dt) {
         fade *
         (0.86 + 0.1 * Math.sin(time * 11 + s.ph) + 0.06 * Math.sin(time * 23 + s.ph * 2.3));
     }
-    Lt.distance = s.node && s.node.own === 0 && theme.key === 'crypt' ? s.range * 1.35 : s.range;
+    Lt.distance =
+      s.node && s.node.own === 0 && (theme.key === 'crypt' || theme.dark) ? s.range * 1.35 : s.range;
     Lt.position.set(s.x, s.y, s.z);
   }
   if (state === 'play' && !hero.dead) {
@@ -298,6 +299,7 @@ function updateAmbient(dt) {
     else if (c.z - camT.z < -40) c.z += 80;
     c.m.position.set(c.x, theme.underY + 0.45, c.z);
     c.m.material.opacity = 0.14 + 0.05 * Math.sin(time * 0.5 + c.s * 7);
+    c.m.material.color.setHex(theme.mistC || 0x5fc8b8);
   }
   moteT -= dt;
   if (moteT <= 0 && theme) {
@@ -307,6 +309,8 @@ function updateAmbient(dt) {
       z = camT.z + rnd(-16, 16);
     if (k === 'forest') sparks.burst(x, rnd(0.4, 2.6), z, theme.mote, 1, 0.5, 0.07, 3, -0.25);
     else if (k === 'crypt') sparks.burst(x, rnd(0.1, 1.6), z, theme.mote, 1, 0.35, 0.07, 3.6, -0.35);
+    else if (k === 'dusk')
+      sparks.burst(x, rnd(0.1, 1.2), z, Math.random() < 0.7 ? theme.mote : 0xffd0a0, 1, 0.7, 0.06, 2.6, -0.9);
     else if (k === 'desert') sparks.burst(x, rnd(0.2, 2), z, theme.mote, 1, 1.6, 0.05, 2.2, 0.3);
     else if (!walkAt(x, z)) {
       if (Math.random() < 0.06) sparks.burst(x, theme.underY + 0.1, z, 0xffc050, 6, 3, 0.12, 0.6);
@@ -328,6 +332,7 @@ function updateAmbient(dt) {
   debris.update(dt);
   updateFx(dt);
   updateBossFx(dt);
+  updatePrinceFx(dt);
   updateDmg(dt);
   updateCorpses(dt);
   updateLights(dt);

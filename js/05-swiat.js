@@ -180,6 +180,8 @@ function clearWorld() {
   resetBossFx();
   cryptReset();
   artReset();
+  princeClear();
+  darkReset();
   for (let i = world.children.length - 1; i >= 0; i--) {
     const o = world.children[i];
     world.remove(o);
@@ -369,6 +371,19 @@ function buildWorld(idx) {
         if (rng() < 0.5) db.add(x, 2.2, z, 1.0, 0.2, 1.0, jit(TH.rimTop));
         else db.add(x + 0.15, 2.25, z, 0.4, 0.3, 0.5, jit(TH.rim));
       } else if (rng() < 0.25) db.add(x, 1.3, z, 0.5, 0.44, 0.5, 0xb5653a);
+    } else if (key === 'dusk') {
+      // blanki cytadeli z obsydianu, czasem z chorągwią albo kolcami
+      const h = (tall ? 2.0 : 1.1) + rng() * 0.5;
+      db.add(x, h / 2, z, 1, h, 1, jit(TH.rim, 0.03));
+      db.add(x, h + 0.08, z, 1.06, 0.16, 1.06, jit(TH.rimTop, 0.03));
+      if ((r[0] + r[1]) % 2) db.add(x, h + 0.36, z, 0.42, 0.4, 0.42, jit(TH.rim, 0.03));
+      if (rng() < 0.3) eb.add(x + (rng() - 0.5) * 0.4, h * 0.45, z + 0.51, 0.08, h * 0.5, 0.02, TH.fire.a);
+      if (!tall && rng() < 0.22) {
+        db.add(x, h + 0.9, z, 0.08, 1.6, 0.08, 0x1a1418);
+        db.add(x + 0.26, h + 1.3, z, 0.5, 0.7, 0.04, 0x7a1424);
+        eb.add(x + 0.26, h + 1.0, z + 0.025, 0.12, 0.12, 0.02, 0xff6070);
+      } else if (rng() < 0.2)
+        for (let k = -1; k <= 1; k += 2) db.add(x + k * 0.28, h + 0.32, z, 0.07, 0.48, 0.07, 0x9a92a4);
     } else if (key === 'crypt') {
       const h = (tall ? 1.9 : 1.0) + rng() * 0.6;
       db.add(x, h / 2, z, 1, h, 1, jit(TH.rim, 0.03));
@@ -468,6 +483,48 @@ function buildWorld(idx) {
         db.add(x, 0.95, z, 0.5, 0.3, 0.5, 0xb28e58, ry);
         db.add(x, 0.3, z, 0.3, 0.6, 0.52, 0x9a7a48, ry);
       } else brazier(x, z);
+    } else if (key === 'dusk') {
+      if (r < 0.22) {
+        // obsydianowa iglica z płonącą żyłą
+        const h = 2 + rng() * 1.6;
+        db.add(x, 0.4, z, 0.9, 0.8, 0.9, jit(0x1c1622, 0.03));
+        db.add(x, 0.8 + h * 0.3, z, 0.6, h * 0.6, 0.6, jit(0x221a2a, 0.03));
+        db.add(x, 0.8 + h * 0.75, z, 0.3, h * 0.35, 0.3, jit(0x1c1622, 0.03));
+        eb.add(x + 0.31, 0.9 + h * 0.3, z, 0.02, h * 0.55, 0.08, TH.fire.a);
+        eb.add(x, 0.9 + h * 0.4, z + 0.31, 0.08, h * 0.4, 0.02, TH.fire.a);
+      } else if (r < 0.4) {
+        // posąg rycerza na cokole
+        const st = jit(0x5a5462, 0.03);
+        db.add(x, 0.2, z, 0.9, 0.4, 0.9, shade(st, -0.06));
+        db.add(x - 0.12, 0.7, z, 0.16, 0.6, 0.2, st);
+        db.add(x + 0.12, 0.7, z, 0.16, 0.6, 0.2, st);
+        db.add(x, 1.25, z, 0.5, 0.55, 0.34, st);
+        db.add(x, 1.7, z, 0.36, 0.36, 0.36, shade(st, 0.04));
+        db.add(x, 1.95, z, 0.06, 0.16, 0.3, shade(st, -0.1));
+        db.add(x + 0.34, 1.2, z + 0.1, 0.12, 0.5, 0.12, st);
+        db.add(x + 0.34, 1.3, z + 0.32, 0.06, 0.06, 0.9, 0x8a8494);
+      } else if (r < 0.58) brazier(x, z);
+      else if (r < 0.74) {
+        // karmazynowe kryształy
+        for (let k = 0; k < 3; k++) {
+          const ox = (rng() - 0.5) * 0.6,
+            oz = (rng() - 0.5) * 0.6,
+            hh = 0.5 + rng() * 0.9;
+          eb.add(x + ox, hh / 2, z + oz, 0.22, hh, 0.22, k ? 0xc02040 : 0xff4a60);
+        }
+        db.add(x, 0.08, z, 0.9, 0.16, 0.9, 0x1c1622);
+        addLight(x, 0.8, z, 0xff3050, 6, 0.6, 1.8);
+      } else if (r < 0.88) {
+        // słup z łańcuchami
+        const h = 1.8 + rng() * 0.8;
+        db.add(x, h / 2, z, 0.5, h, 0.5, jit(0x2a2230, 0.03));
+        db.add(x, h + 0.1, z, 0.7, 0.2, 0.7, jit(0x32283c, 0.03));
+        for (let k = 0; k < 4; k++) db.add(x + 0.27, h * 0.8 - k * 0.22, z, 0.06, 0.16, 0.12, 0x4a4450);
+      } else {
+        db.add(x, 0.3, z, 1.0, 0.6, 0.62, jit(0x2a2230, 0.03), rng() < 0.5 ? 0 : Math.PI / 2);
+        db.add(x, 0.66, z, 1.06, 0.12, 0.68, 0x3a3044);
+        eb.add(x, 0.73, z, 0.5, 0.02, 0.08, TH.fire.a);
+      }
     } else if (key === 'crypt') {
       if (r < 0.3) {
         const ry = (rng() - 0.5) * 0.5,
@@ -564,6 +621,11 @@ function buildWorld(idx) {
         db.add(x, 0.16, z, 0.3, 0.32, 0.3, 0xb5653a);
         db.add(x, 0.34, z, 0.22, 0.06, 0.22, 0x8a4a28);
       }
+    } else if (key === 'dusk') {
+      if (r < 0.3) fb.add(x, 0.1, z, 0.08, 0.2, 0.08, 0x4a1a24);
+      else if (r < 0.55) eb.add(x, 0.012, z, 0.5 + rng() * 0.4, 0.022, 0.08, 0xc02040, rng() * 3);
+      else if (r < 0.8) db.add(x, 0.06, z, 0.26, 0.12, 0.22, 0x1c1622, rng() * 3);
+      else db.add(x, 0.04, z, 0.45, 0.07, 0.08, 0xd8d2c0, rng() * 3);
     } else if (key === 'crypt') {
       if (r < 0.32) {
         fb.add(x, 0.12, z, 0.08, 0.24, 0.08, 0x2f4a3c);
@@ -616,7 +678,7 @@ function buildWorld(idx) {
       scatter(x, z);
     }
   }
-  if (key === 'crypt') cryptBuild(L, rng, pathM, linkD, db);
+  if (TH.traps) cryptBuild(L, rng, pathM, linkD, db);
   for (const n of L.nodes) {
     const ci = n.x | 0,
       cj = n.z | 0;
@@ -742,7 +804,20 @@ function buildWorld(idx) {
         jit(0x6a4630),
         rng() * 3
       );
-    else if (key === 'crypt') {
+    else if (key === 'dusk') {
+      if (rng() < 0.15) eb.add(x, TH.underY + 0.06, z, 0.22, 0.05, 0.22, 0xc02040, rng() * 3);
+      else
+        wb.add(
+          x,
+          TH.underY + 0.1,
+          z,
+          0.6 + rng() * 1.6,
+          0.18,
+          0.5 + rng() * 1.4,
+          jit(0x120a16, 0.02),
+          rng() * 3
+        );
+    } else if (key === 'crypt') {
       if (rng() < 0.12) eb.add(x, TH.underY + 0.06, z, 0.24, 0.05, 0.24, TH.fire.a, rng() * 3);
       else
         wb.add(

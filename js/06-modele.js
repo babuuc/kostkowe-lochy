@@ -292,6 +292,51 @@ function buildModel(type, root) {
     }
     P.col = skin;
     P.lean = 0.12;
+  } else if (type === 'knight') {
+    // rycerz mroku: wieżowa tarcza w lewej ręce, miecz w prawej, świecąca szczelina hełmu
+    const steel = 0x3c3c48,
+      sd = 0x26262f,
+      trim = 0xff4060;
+    P = humanoid(root, {
+      legH: 0.46,
+      legW: 0.17,
+      legC: sd,
+      bodyW: 0.56,
+      bodyH: 0.56,
+      bodyD: 0.36,
+      bodyC: steel,
+      headW: 0.46,
+      headH: 0.46,
+      headD: 0.46,
+      headC: steel,
+      armW: 0.16,
+      armH: 0.52,
+      armC: sd,
+    });
+    const H = P.head,
+      B = P.body;
+    box(B, 0.6, 0.12, 0.4, 0x16161c, 0, 0.08, 0, 0, 1);
+    box(B, 0.12, 0.24, 0.04, trim, 0, 0.34, 0.19, trim, 1);
+    box(B, 0.5, 0.1, 0.38, sd, 0, 0.5, 0, 0, 1);
+    for (const s of [-1, 1]) {
+      const A = s < 0 ? P.armL : P.armR;
+      box(A, 0.3, 0.16, 0.34, steel, 0, 0.06, 0, 0, 1);
+      box(A, 0.06, 0.16, 0.06, 0xa8a8b8, s * 0.09, 0.2, 0, 0, 1);
+      box(s < 0 ? P.kneeL : P.kneeR, 0.2, 0.1, 0.24, steel, 0, -0.06, 0.04, 0, 1);
+    }
+    box(H, 0.52, 0.12, 0.52, sd, 0, 0.46, 0, 0, 1);
+    eye(P, H, 0.34, 0.05, trim, trim, 0, 0.25, 0.235);
+    box(H, 0.08, 0.22, 0.36, trim, 0, 0.62, -0.02, 0, 1);
+    box(P.elbL, 0.08, 0.8, 0.58, 0x24242c, -0.1, -0.22, 0.08);
+    box(P.elbL, 0.05, 0.84, 0.06, 0xa8a8b8, -0.13, -0.22, 0.38, 0, 1);
+    box(P.elbL, 0.04, 0.3, 0.18, trim, -0.15, -0.22, 0.08, trim, 1);
+    box(P.elbR, 0.07, 0.07, 0.24, 0x6a5a4a, 0, -0.22, 0.08, 0, 1);
+    box(P.elbR, 0.08, 0.06, 0.9, 0xc8ccd4, 0, -0.22, 0.6);
+    glowSprite(H, trim, 0.9, 0, 0.25, 0.3, 0.6);
+    P.col = steel;
+    P.lean = 0.06;
+  } else if (type === 'prince') {
+    P = buildPrince(root);
   } else if (type === 'skelet') {
     // kościany wojownik: zardzewiały hełm, tarcza i miecz
     const bone = 0xe2ded0,
@@ -459,7 +504,7 @@ function makeUnit(type, x, z, home) {
     dead: false,
     spawnT: 0.45,
     spawnDur: 0.45,
-    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.8 : elite ? 1.28 : 1,
+    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.8 : type === 'prince' ? 1.9 : elite ? 1.28 : 1,
     h: def.h * (elite ? 1.25 : 1),
     meshes: [],
     pcol: 0xffffff,
@@ -484,6 +529,7 @@ function makeUnit(type, x, z, home) {
   if (elite) glowSprite(u.root, COL_E, 2.6, 0, 0.5, 0, 0.45);
   u.frags = bake(u.root, type + '|' + theme.key);
   if (def.lich) lichSkin(u.root);
+  else if (def.prince) princeSkin(u.root);
   // zwykli wrogowie rzucają cień tylko tułowiem i głową (resztę załatwia miękki cień pod stopami)
   else if (u.parts.body && u.parts.legL)
     u.root.traverse(o => {
@@ -660,6 +706,8 @@ const hero = {
   box(cape2, 0.56, 0.05, 0.06, gold, 0, -0.35, 0, 0, D);
   P.cape = cape;
   P.cape2 = cape2;
+  // w ciemnych etapach peleryna świeci (Peleryna świetlików)
+  P.capeGlow = glowSprite(cape2, 0xd8c0ff, 1.4, 0, -0.3, -0.08, 0.6);
   // miecz w prawej dłoni
   box(ER, 0.3, 0.07, 0.1, gold, 0, -0.3, 0, 0, D);
   box(ER, 0.06, 0.14, 0.06, leather, 0, -0.22, 0, 0, D);
@@ -750,6 +798,9 @@ function heroStats(U, tal) {
     golem: 1 + 0.2 * U.gol,
     golems: U.gol >= 4 ? 3 : 2,
     golemBoom: U.gol >= 8,
+    sight: 6.2 + 0.5 * (U.cape || 0),
+    eyes: (U.cape || 0) >= 4,
+    flare: (U.cape || 0) >= 8,
     T,
   };
 }
@@ -784,6 +835,11 @@ function resetHero() {
   h.secondUsed = false;
   h.hunter = false;
   h.cloakT = 0;
+  h.sight = S.sight;
+  h.eyes = S.eyes;
+  h.flare = S.flare;
+  h.parts.capeGlow.visible = !!theme.dark && (save.up.cape || 0) > 0;
+  h.parts.capeGlow.scale.setScalar(0.8 + 0.18 * (save.up.cape || 0));
   h.x = n.x;
   h.z = n.z + 2.8;
   h.vx = h.vz = h.kx = h.kz = 0;

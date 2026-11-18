@@ -90,8 +90,14 @@ function updateHud(dt) {
   if (boss) {
     $('bossfill').style.width = (clamp(boss.hp / boss.maxHp, 0, 1) * 100).toFixed(1) + '%';
     const bh = $('bosshp');
-    bh.classList.toggle('phased', !!boss.def.lich);
-    bh.classList.toggle('shielded', !!(boss.def.lich && lichImmune(boss)));
+    bh.classList.toggle('phased', !!(boss.def.lich || boss.def.prince));
+    bh.classList.toggle(
+      'shielded',
+      !!((boss.def.lich && lichImmune(boss)) || (boss.def.prince && princeImmune(boss)))
+    );
+    bh.classList.toggle('crimson', !!boss.def.prince);
+    bh.style.setProperty('--m1', boss.def.prince ? '40%' : '33%');
+    bh.style.setProperty('--m2', boss.def.prince ? '70%' : '66%');
   }
   // strzałka przy krawędzi ekranu, gdy boss jest poza kadrem
   {
@@ -445,7 +451,10 @@ function finish(kind) {
     $('resH').textContent = next ? 'Etap ukończony' : 'Lochy oczyszczone';
     $('resP').textContent = next
       ? 'Wszystkie kapliczki świecą na niebiesko. Premia: ' + bonus + ' odłamków.'
-      : 'Strażnik padł, a ostatnia kapliczka jest twoja. Premia: ' + bonus + ' odłamków.';
+      : (level.bossName || 'Strażnik') +
+        ' padł, a ostatnia kapliczka jest twoja. Premia: ' +
+        bonus +
+        ' odłamków.';
     {
       let st = '';
       for (let k = 0; k < 3; k++)
