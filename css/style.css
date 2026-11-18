@@ -1,5 +1,9 @@
 /* Kostkowe Lochy: wygląd menu, HUD i przycisków dotykowych */
 :root {
+  --good: #1a7a3a;
+  --bad: #b8402a;
+  --poor: #a0503a;
+  --goldtxt: #7a4a12;
   --panel: #efe5c8;
   --panel2: #e0d3ad;
   --edge: #3a3020;
@@ -23,6 +27,10 @@
     --edge: #0b0d12;
     --ink: #f3ecd8;
     --dim: #a9a892;
+    --good: #7fe08a;
+    --bad: #ff8a70;
+    --poor: #e8907a;
+    --goldtxt: #ffc23d;
     color-scheme: dark;
   }
 }
@@ -32,6 +40,10 @@
   --edge: #0b0d12;
   --ink: #f3ecd8;
   --dim: #a9a892;
+  --good: #7fe08a;
+  --bad: #ff8a70;
+  --poor: #e8907a;
+  --goldtxt: #ffc23d;
   color-scheme: dark;
 }
 *,
@@ -148,14 +160,26 @@ button:focus-visible {
   font-weight: 600;
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
 }
+/* ikona odłamka: obrócony kwadrat; marginesy zostawiają miejsce na rogi po obrocie i obwódkę */
 .gem {
   display: inline-block;
-  width: 11px;
-  height: 11px;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 0 4px;
+  vertical-align: middle;
   background: var(--gold);
   transform: rotate(45deg);
-  margin-right: 7px;
   box-shadow: 0 0 0 2px var(--gold-d);
+}
+/* kwota z ikoną: zawsze w jednej linii, ikona wyśrodkowana względem cyfr */
+.price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  line-height: 1;
+  vertical-align: middle;
 }
 #lives {
   display: flex;
@@ -1066,8 +1090,9 @@ body.touch #bPot {
 .small {
   font-size: 13px;
 }
+
 .warn {
-  color: #b8402a;
+  color: var(--bad);
   font-weight: 600;
 }
 .fdet.bought {
@@ -1142,26 +1167,6 @@ body.touch #bPot {
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--edge);
 }
-.tile .lv {
-  display: flex;
-  gap: 2px;
-}
-.tile .lv i {
-  width: 7px;
-  height: 7px;
-  background: var(--edge);
-  opacity: 0.35;
-}
-.tile .lv i.on {
-  background: #1f9a94;
-  opacity: 1;
-}
-.tile .lv i.ms {
-  box-shadow: 0 0 0 1px var(--gold-d);
-}
-.tile .lv i.ms.on {
-  background: var(--gold);
-}
 .diff,
 .ms,
 .plain {
@@ -1180,23 +1185,8 @@ body.touch #bPot {
   color: var(--dim);
 }
 .diff b,
-.plain.next li,
-.ms li.got span {
-  color: #1a7a3a;
-}
-.ms li {
-  display: flex;
-  gap: 10px;
-  padding: 4px 0;
-  color: var(--dim);
-}
-.ms li span {
-  flex: none;
-  width: 54px;
-  font-weight: 700;
-}
-.ms li.got {
-  color: var(--ink);
+.plain.next li {
+  color: var(--good);
 }
 .plain li {
   padding: 3px 0;
@@ -1217,11 +1207,6 @@ body.touch #bPot {
 .eqrow .btn {
   flex: 1;
 }
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 20px;
-}
 .srow {
   display: flex;
   justify-content: space-between;
@@ -1233,7 +1218,7 @@ body.touch #bPot {
 .power {
   font-size: 46px;
   font-weight: 700;
-  color: var(--gold-d);
+  color: var(--goldtxt);
   margin: 2px 0 0;
   line-height: 1;
 }
@@ -1378,9 +1363,6 @@ body.touch #bArt2 {
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
   }
-  .stats {
-    grid-template-columns: 1fr;
-  }
   .fhead h2 {
     font-size: 22px;
   }
@@ -1513,12 +1495,25 @@ body.touch #bArt2 {
   background: var(--c, #1f9a94);
   opacity: 1;
 }
-.lvbar i.ms {
-  box-shadow: 0 0 0 2px var(--gold-d);
+.lvbar i {
+  position: relative;
+}
+.lvbar i.ms::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  background: var(--gold-d);
+}
+.lvbar {
+  padding-top: 6px;
 }
 .tile .lvbar {
   width: 100%;
-  padding: 0 4px;
+  padding: 6px 4px 0;
 }
 .tile .ic {
   color: var(--c, var(--gold));
@@ -1529,7 +1524,7 @@ body.touch #bArt2 {
   color: var(--dim);
 }
 .tile .cost.poor {
-  color: #a0503a;
+  color: var(--poor);
 }
 .tile.afford {
   border-color: var(--gold-d);
@@ -1538,7 +1533,7 @@ body.touch #bArt2 {
     0 0 0 2px rgba(255, 194, 61, 0.45);
 }
 .tile.maxed {
-  background: #f2e2a8;
+  background: rgba(255, 194, 61, 0.22);
 }
 .tile.art .lvbar {
   width: 60%;
@@ -1581,7 +1576,7 @@ body.touch #bArt2 {
   color: var(--ink);
 }
 .perk.got .pl {
-  color: var(--gold-d);
+  color: var(--goldtxt);
 }
 .tipbox {
   margin-top: 12px;
@@ -1591,7 +1586,7 @@ body.touch #bArt2 {
   font-size: 14px;
 }
 .ok {
-  color: #1a7a3a;
+  color: var(--good);
   font-weight: 600;
 }
 .center {
@@ -1606,7 +1601,7 @@ body.touch #bArt2 {
   font-size: 40px;
   font-weight: 700;
   margin: 4px 0 !important;
-  color: var(--gold-d);
+  color: var(--goldtxt);
   line-height: 1;
 }
 .flist.hero {
@@ -1721,4 +1716,30 @@ button.srow.sel {
   .ftab.on {
     flex: 2.6;
   }
+}
+
+/* kwoty na kafelkach i przyciskach */
+.tile .cost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+}
+.buy .price,
+.btn .price {
+  margin-left: 4px;
+}
+.devsum small {
+  white-space: nowrap;
+}
+.fres .price {
+  gap: 6px;
+}
+/* odznaki na zakładkach wystają nad krawędź, więc pasek zakładek ma na nie miejsce */
+.ftabs {
+  padding-top: 10px;
+  margin-top: -6px;
+}
+.ftabs {
+  padding-right: 6px;
 }

@@ -190,7 +190,7 @@ function bought() {
   void d.offsetWidth;
   d.classList.add('bought');
 }
-const gem = n => n + '<i class="gem"></i>';
+const gem = n => '<span class="price"><i class="gem"></i>' + n + '</span>';
 // czego gracza stać: do odznak na zakładkach i kafelkach
 function canBuyUp(u) {
   const lv = save.up[u.k];
@@ -426,7 +426,7 @@ function renderUpTab(L, det) {
     el(
       'p',
       'muted small center',
-      'Masz ' + gem(save.gems) + ' Odłamki zdobywasz za wrogów, kapliczki i ukończone etapy.'
+      'Masz ' + gem(save.gems) + '. Odłamki zdobywasz za wrogów, kapliczki i ukończone etapy.'
     )
   );
 }

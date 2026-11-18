@@ -130,7 +130,9 @@ const ART_FX = {
       if (u.dead) continue;
       if (u.def.boss) dmgNum(u.x, u.h + 0.6, u.z, 'odporny', 'ally');
       else {
+        // zamrożony stoi jak bryła lodu: bez odrzutu i bez przepychania
         u.frozen = v.t;
+        u.kx = u.kz = 0;
         u.dashT = 0;
       }
     }

@@ -332,7 +332,7 @@ function renderMenu() {
       UPGRADES.length * UP_MAX +
       '</b><small>ulepszenia</small></span><span><b>' +
       free +
-      '</b><small>wolne punkty</small></span><span><b>' +
+      '</b><small>punkty</small></span><span><b>' +
       arts +
       '/' +
       ARTIFACTS.length +

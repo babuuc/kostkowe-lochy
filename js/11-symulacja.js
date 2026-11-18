@@ -100,8 +100,8 @@ function separate() {
       const p = (m - d) * 0.5,
         ux = dx / d,
         uz = dz / d,
-        wa = a.def.heavy ? 0.2 : 1,
-        wb = b.def.heavy ? 0.2 : 1;
+        wa = a.frozen > 0 ? 0 : a.def.heavy ? 0.2 : 1,
+        wb = b.frozen > 0 ? 0 : b.def.heavy ? 0.2 : 1;
       moveCircle(a, -ux * p * wa, -uz * p * wa);
       moveCircle(b, ux * p * wb, uz * p * wb);
     }
@@ -114,7 +114,7 @@ function separate() {
         const p = m - d,
           ux = dx / d,
           uz = dz / d;
-        if (a.def.heavy) moveCircle(hero, -ux * p, -uz * p);
+        if (a.def.heavy || a.frozen > 0) moveCircle(hero, -ux * p, -uz * p);
         else {
           moveCircle(a, ux * p * 0.8, uz * p * 0.8);
           moveCircle(hero, -ux * p * 0.2, -uz * p * 0.2);

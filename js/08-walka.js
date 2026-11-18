@@ -69,7 +69,7 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
   const dx = t.x - fx,
     dz = t.z - fz,
     d = Math.hypot(dx, dz) || 1,
-    k = (kb || 0) / (t.def.heavy ? 3.2 : t.elite ? 1.8 : 1);
+    k = t.frozen > 0 ? 0 : (kb || 0) / (t.def.heavy ? 3.2 : t.elite ? 1.8 : 1);
   t.kx += (dx / d) * k;
   t.kz += (dz / d) * k;
   if (t !== hero && !t.def.heavy && !t.def.steady && !t.elite && kb > 4) {
