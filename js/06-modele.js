@@ -335,7 +335,7 @@ function buildModel(type, root) {
     glowSprite(H, trim, 0.9, 0, 0.25, 0.3, 0.6);
     P.col = steel;
     P.lean = 0.06;
-  } else if (type === 'prince') {
+  } else if (type === 'prince' || type === 'shade') {
     P = buildPrince(root);
   } else if (type === 'skelet') {
     // kościany wojownik: zardzewiały hełm, tarcza i miecz
@@ -504,7 +504,16 @@ function makeUnit(type, x, z, home) {
     dead: false,
     spawnT: 0.45,
     spawnDur: 0.45,
-    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.8 : type === 'prince' ? 1.9 : elite ? 1.28 : 1,
+    baseScale:
+      type === 'boss'
+        ? 1.75
+        : type === 'lich'
+          ? 1.8
+          : type === 'prince' || type === 'shade'
+            ? 1.9
+            : elite
+              ? 1.28
+              : 1,
     h: def.h * (elite ? 1.25 : 1),
     meshes: [],
     pcol: 0xffffff,
@@ -530,6 +539,7 @@ function makeUnit(type, x, z, home) {
   u.frags = bake(u.root, type + '|' + theme.key);
   if (def.lich) lichSkin(u.root);
   else if (def.prince) princeSkin(u.root);
+  else if (def.shade) shadeSkin(u.root);
   // zwykli wrogowie rzucają cień tylko tułowiem i głową (resztę załatwia miękki cień pod stopami)
   else if (u.parts.body && u.parts.legL)
     u.root.traverse(o => {
@@ -798,7 +808,7 @@ function heroStats(U, tal) {
     golem: 1 + 0.2 * U.gol,
     golems: U.gol >= 4 ? 3 : 2,
     golemBoom: U.gol >= 8,
-    sight: 6.2 + 0.5 * (U.cape || 0),
+    sight: 3.6 + 0.35 * (U.cape || 0),
     eyes: (U.cape || 0) >= 4,
     flare: (U.cape || 0) >= 8,
     T,
@@ -835,6 +845,7 @@ function resetHero() {
   h.secondUsed = false;
   h.hunter = false;
   h.cloakT = 0;
+  h.chainT = 0;
   h.sight = S.sight;
   h.eyes = S.eyes;
   h.flare = S.flare;

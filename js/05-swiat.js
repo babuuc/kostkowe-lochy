@@ -181,6 +181,7 @@ function clearWorld() {
   cryptReset();
   artReset();
   princeClear();
+  princeClear2();
   darkReset();
   for (let i = world.children.length - 1; i >= 0; i--) {
     const o = world.children[i];

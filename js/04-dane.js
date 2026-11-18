@@ -361,7 +361,7 @@ const LEVELS = [
     theme: 'dusk',
     hints: [
       'W Cytadeli widać tylko to, co blisko ciebie. Przejęte kapliczki rozświetlają mrok wokół siebie.',
-      'Peleryna świetlików (Rozwój, Ulepszenia) poszerza pole widzenia w ciemności.',
+      'Płaszcz cienia (artefakt) na czas działania rozprasza mrok, a Peleryna świetlików poszerza pole widzenia na stałe.',
       'Rycerze mroku zasłaniają się tarczą. Zajdź ich z boku albo przebij tarczę wirem lub ciosem krytycznym.',
       'Czerwone ostrzeżenia i pociski widać nawet w ciemności.',
     ],
@@ -372,7 +372,8 @@ const LEVELS = [
     bossType: 'prince',
     bossNode: 11,
     bossName: 'Książę Zmierzchu',
-    bossHint: 'Stożek to zamach mieczem, pierścień przeskocz unikiem. W zaćmieniu trzymaj się światła.',
+    bossHint:
+      'Pięć faz. Stożek to zamach mieczem, pierścień przeskocz unikiem, a postawy z mieczem przed sobą nie atakuj mieczem.',
     shieldAt: 4,
     elite: 0.22,
     nodes: [
@@ -539,8 +540,24 @@ const UNIT = {
     steady: true,
     h: 1.75,
   },
+  shade: {
+    hp: 1,
+    spd: 0,
+    r: 1.1,
+    dmg: 0,
+    range: 0,
+    wind: 1,
+    rec: 1,
+    cd: 99,
+    gems: 0,
+    aggro: 0,
+    shade: true,
+    steady: true,
+    heavy: true,
+    h: 4.4,
+  },
   prince: {
-    hp: 2300,
+    hp: 3200,
     spd: 2.5,
     r: 1.3,
     dmg: 28,
@@ -682,7 +699,7 @@ const UPGRADES = [
     name: 'Peleryna świetlików',
     icon: 'cloak',
     lore: 'Utkana z nici, w których śpią świetliki. W ciemności jaśnieje coraz mocniej.',
-    per: '+0,5 m widoczności w ciemnych miejscach',
+    per: '+0,35 m widoczności w ciemnych miejscach',
     m: [
       'wrogowie w mroku zdradzają się świecącymi oczami',
       'co 8 s peleryna rozbłyska i na chwilę rozświetla okolicę',
@@ -774,7 +791,7 @@ const ARTIFACTS = [
     icon: 'cloak',
     price: 200,
     upPrice: [220, 340],
-    desc: 'Rozpływasz się w cieniu: jesteś nietykalny, szybszy o 40%, a wrogowie tracą cię z oczu. Pierwszy cios mieczem z cienia jest krytyczny i kończy działanie płaszcza.',
+    desc: 'Rozpływasz się w cieniu: jesteś nietykalny, szybszy o 40%, a wrogowie tracą cię z oczu. Póki płaszcz działa, w ciemnych miejscach widzisz wszystko. Pierwszy cios mieczem z cienia jest krytyczny i kończy działanie płaszcza.',
     lv: [
       { cd: 30, t: 2.5 },
       { cd: 26, t: 3 },
@@ -847,7 +864,7 @@ const ART_TIP = {
   totem: 'Walka z bossem i długie potyczki w jednym miejscu.',
   frost: 'Tłum przy kryształach i przerywanie zamachów osiłków.',
   thunder: 'Łucznicy i szamani, do których trudno podejść.',
-  cloak: 'Ucieczka z okrążenia i pewny krytyk na otwarcie walki.',
+  cloak: 'Ucieczka z okrążenia, pewny krytyk na otwarcie walki i chwila pełnej widoczności w Cytadeli Mroku.',
 };
 // Talenty: każda zdobyta gwiazdka to punkt. Gałąź ma 4 stopnie, a każdy stopień wymaga poprzedniego.
 const BRANCHES = ['Miecz', 'Łuk', 'Dusza'];

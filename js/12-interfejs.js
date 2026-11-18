@@ -96,6 +96,7 @@ function updateHud(dt) {
       !!((boss.def.lich && lichImmune(boss)) || (boss.def.prince && princeImmune(boss)))
     );
     bh.classList.toggle('crimson', !!boss.def.prince);
+    bh.classList.toggle('five', !!boss.def.prince);
     bh.style.setProperty('--m1', boss.def.prince ? '40%' : '33%');
     bh.style.setProperty('--m2', boss.def.prince ? '70%' : '66%');
   }

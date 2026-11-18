@@ -1,10 +1,13 @@
-/* Kostkowe Lochy: Książę Zmierzchu, boss etapu 5 (Cytadela Mroku).
-   Faza 1 (powyżej 70%): zamach mieczem w stożku, seria trzech cięć, fala wstrząsu, szarża.
-   Faza 2 (70–40%): zaćmienie – mrok gęstnieje, Książę znika na chwilę, a z cienia wychodzą upiory;
-     potem podwójne zamachy, dwie fale wstrząsu i rzucane ostrza.
-   Faza 3 (poniżej 40%): krwawy księżyc – mrok się rozrzedza, Książę jest szybszy, szarża zostawia ogień,
-     trzy fale wstrząsu naraz i deszcz meteorów.
-   Fale wstrząsu to rosnące pierścienie: trzeba je przeskoczyć unikiem albo trzymać się daleko.
+/* Kostkowe Lochy: Książę Zmierzchu, ostateczny boss (etap 5, Cytadela Mroku). Walka ma pięć faz:
+   1. Szermierz (100–80%): zamach w stożku, seria cięć, pchnięcie, fala wstrząsu, szarża i postawa riposty
+      (cios mieczem w postawę zostaje sparowany i oddany obrotowym cięciem; wir i łuk działają).
+   2. Taniec cieni (80–60%): mrok gęstnieje, Książę dzieli się na trzy postacie, które po kolei szarżują;
+      tylko prawdziwy ma złotą koronę i daje się zranić. Dochodzą rzucane ostrza.
+   3. Krwawy księżyc (60–40%): pęknięcia ziemi wyrzucają ogień w liniach, szarża zostawia płomienie, spadają meteory.
+   4. Wieczna noc (40–20%): gasną światła, zostają trzy słupy światła. Pochłonięcie rani każdego poza słupem,
+      a łańcuch przyciąga bohatera do Księcia, dopóki go nie zerwie unikiem.
+   5. Ostatnie tchnienie (20–0%): Książę unosi się nad ziemią, krąży wokół niego sześć mieczy, a cięcia świata
+      przecinają całą arenę; do tego spirale ostrzy i potrójne fale.
    Pliki z folderu js/ są ładowane po kolei (zobacz index.html) i dzielą wspólne zmienne globalne. */
 'use strict';
 const PRINCE_C = 0xff3a50;
@@ -167,6 +170,9 @@ function buildPrince(root) {
   P.tip = new THREE.Object3D();
   P.tip.position.set(0, -3.3, 0);
   E.add(P.tip);
+  P.tipA = new THREE.Object3D();
+  P.tipA.position.set(0, -0.9, 0);
+  E.add(P.tipA);
   // poświata i krąg run pod stopami
   const pool = new THREE.Mesh(POOL_GEO, princePoolMat);
   pool.rotation.x = -Math.PI / 2;
@@ -380,55 +386,336 @@ function princeClear() {
   }
 }
 
+/* ---------- dodatkowe efekty: smuga miecza, linie, słupy światła, łańcuch, krążące miecze ---------- */
+// smuga za mieczem Księcia (taka sama zasada jak u bohatera, osobne bufory)
+const PT_N = 12,
+  ptPos = new Float32Array(PT_N * 6),
+  ptGeo = new THREE.BufferGeometry(),
+  ptS = [];
+{
+  const uv = new Float32Array(PT_N * 4),
+    idx = [];
+  for (let i = 0; i < PT_N; i++) {
+    const u = i / (PT_N - 1);
+    uv.set([u, 0, u, 1], i * 4);
+    if (i < PT_N - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  }
+  ptGeo.setAttribute('position', new THREE.BufferAttribute(ptPos, 3));
+  ptGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  ptGeo.setIndex(idx);
+}
+const ptMesh = new THREE.Mesh(
+  ptGeo,
+  new THREE.MeshBasicMaterial({
+    map: dataTex(32, 2, u => Math.pow(1 - u, 1.3)),
+    color: 0xff6a7a,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    fog: false,
+  })
+);
+ptMesh.frustumCulled = false;
+ptMesh.visible = false;
+fxG.add(ptMesh);
+function princeTrail(u, on, dt) {
+  for (const p of ptS) p.t += dt;
+  while (ptS.length && ptS[ptS.length - 1].t > 0.16) ptS.pop();
+  if (on) {
+    u.root.updateMatrixWorld(true);
+    u.parts.tipA.getWorldPosition(tmpV);
+    u.parts.tip.getWorldPosition(tmpV2);
+    ptS.unshift({ p: [tmpV.x, tmpV.y, tmpV.z, tmpV2.x, tmpV2.y, tmpV2.z], t: 0 });
+    if (ptS.length > PT_N) ptS.pop();
+  }
+  const n = ptS.length;
+  if (n < 2) {
+    ptMesh.visible = false;
+    return;
+  }
+  for (let i = 0; i < PT_N; i++) ptPos.set(ptS[Math.min(i, n - 1)].p, i * 6);
+  ptGeo.attributes.position.needsUpdate = true;
+  ptGeo.setDrawRange(0, (n - 1) * 6);
+  ptMesh.visible = true;
+}
+// linie ostrzegawcze tej klatki (szarże, pchnięcia, pęknięcia, cięcia świata): rysuje je aimLine, a mrok wycina pod nimi światło
+const pLines = [];
+function lineTele(x0, z0, x1, z1, k, w) {
+  aimLine(x0, z0, x1, z1, k, w, 0.07);
+  pLines.push({ x0, z0, x1, z1, w });
+}
+function segD(px, pz, x0, z0, x1, z1) {
+  const vx = x1 - x0,
+    vz = z1 - z0,
+    t = clamp(((px - x0) * vx + (pz - z0) * vz) / (vx * vx + vz * vz || 1), 0, 1);
+  return Math.hypot(px - (x0 + vx * t), pz - (z0 + vz * t));
+}
+// błysk cięcia wzdłuż linii
+const cuts = [];
+for (let i = 0; i < 4; i++) {
+  const m = new THREE.Mesh(
+    BOX,
+    new THREE.MeshBasicMaterial({
+      color: 0xffd0d8,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  m.visible = false;
+  fxG.add(m);
+  cuts.push({ m, t: 0 });
+}
+function cutFx(x0, z0, x1, z1, w) {
+  const c = cuts.find(c => c.t <= 0) || cuts[0],
+    dx = x1 - x0,
+    dz = z1 - z0;
+  c.t = 0.35;
+  c.m.position.set((x0 + x1) / 2, 0.6, (z0 + z1) / 2);
+  c.m.rotation.set(0, Math.atan2(dx, dz), 0);
+  c.m.scale.set(w, 0.12, Math.hypot(dx, dz));
+  c.m.visible = true;
+}
+// słupy światła z fazy 4: jedyne bezpieczne miejsca przed Pochłonięciem
+const pillars = [];
+for (let i = 0; i < 3; i++) {
+  const g = new THREE.Group(),
+    beam = new THREE.Mesh(
+      BEAM_GEO,
+      new THREE.MeshBasicMaterial({
+        map: beamTex,
+        color: 0xfff0b0,
+        transparent: true,
+        opacity: 0.55,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      })
+    ),
+    ring = new THREE.Mesh(
+      RING_GEO,
+      new THREE.MeshBasicMaterial({
+        color: 0xffe08a,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        fog: false,
+      })
+    );
+  beam.position.y = 6.5;
+  beam.scale.set(4.4, 1, 4.4);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.06;
+  ring.scale.setScalar(0.95);
+  g.add(beam, ring);
+  glowSprite(g, 0xffe08a, 3.4, 0, 1.2, 0, 0.5);
+  g.visible = false;
+  fxG.add(g);
+  pillars.push({ g, on: false, x: 0, z: 0 });
+}
+const PILLAR_R = 2.0;
+function inPillar(x, z) {
+  return pillars.some(p => p.on && Math.hypot(x - p.x, z - p.z) < PILLAR_R);
+}
+// łańcuch z fazy 4
+const chainM = new THREE.Mesh(BOX, mat(0x8a8494, 0x401018));
+chainM.visible = false;
+fxG.add(chainM);
+// sześć mieczy krążących wokół Księcia w fazie 5
+const orbitGeo = (function () {
+  const parts = [],
+    add = (w, h, d, x, y, z, c) => {
+      const m = new THREE.Mesh(BOX, mat(c));
+      m.scale.set(w, h, d);
+      m.position.set(x, y, z);
+      parts.push(m);
+    };
+  add(0.14, 2.0, 0.06, 0, 0, 0, 0xffb0b8);
+  add(0.05, 1.8, 0.08, 0, 0, 0, 0xff3a50);
+  add(0.5, 0.08, 0.12, 0, 1.0, 0, 0xffd080);
+  add(0.08, 0.3, 0.08, 0, 1.2, 0, 0x5a2a20);
+  return mergeBoxes(parts);
+})();
+const orbit = [];
+for (let i = 0; i < 6; i++) {
+  const m = new THREE.Mesh(orbitGeo, CHAR_GLOW);
+  m.visible = false;
+  fxG.add(m);
+  orbit.push(m);
+}
+let orbitOn = false,
+  orbitR = 3,
+  orbitHitT = 0;
+
+function updatePrinceFx2(dt) {
+  for (const c of cuts) {
+    if (c.t <= 0) continue;
+    c.t -= dt;
+    c.m.material.opacity = Math.max(0, c.t / 0.35) * 0.95;
+    if (c.t <= 0) c.m.visible = false;
+  }
+  for (const p of pillars) {
+    if (!p.on) continue;
+    p.g.children[1].rotation.z += dt;
+    p.g.children[0].material.opacity = 0.45 + Math.sin(time * 3 + p.x) * 0.12;
+  }
+  const b = boss && boss.def.prince && !boss.dead ? boss : null;
+  // krążące miecze
+  const show = !!(b && orbitOn && b.spawnT <= 0);
+  for (let i = 0; i < 6; i++) orbit[i].visible = show;
+  if (show) {
+    orbitR = 4 + Math.sin(time * 1.4) * 1.6;
+    if (orbitHitT > 0) orbitHitT -= dt;
+    for (let i = 0; i < 6; i++) {
+      const a = time * 1.5 + (i * TAU) / 6,
+        x = b.x + Math.sin(a) * orbitR,
+        z = b.z + Math.cos(a) * orbitR;
+      orbit[i].position.set(x, 1.4 + Math.sin(time * 3 + i) * 0.25, z);
+      orbit[i].rotation.set(Math.PI / 2, a + Math.PI / 2, time * 4);
+      if (
+        state === 'play' &&
+        orbitHitT <= 0 &&
+        !hero.dead &&
+        Math.hypot(hero.x - x, hero.z - z) < 0.9 + hero.r &&
+        hurt(hero, b.dmg * 0.5, x, z, 9)
+      )
+        orbitHitT = 0.7;
+      if (Math.random() < 0.15) burst(x, 1.4, z, 0xff6070, 1, 0.4, 0.08, 0.3, 0);
+    }
+  }
+  // łańcuch przyciągający bohatera
+  const h = hero;
+  if (h.chainT > 0 && b && !h.dead) {
+    h.chainT -= dt;
+    const dx = b.x - h.x,
+      dz = b.z - h.z,
+      d = Math.hypot(dx, dz) || 1;
+    if (h.rollT > 0) {
+      h.chainT = 0;
+      dmgNum(h.x, h.h + 0.6, h.z, 'zerwany!', 'crit');
+      burst(h.x, 1, h.z, 0xc8c0d0, 12, 5, 0.1, 0.4);
+      sfx.block();
+    } else if (d > 2.4) moveCircle(h, (dx / d) * 7 * dt, (dz / d) * 7 * dt);
+    chainM.visible = h.chainT > 0;
+    chainM.position.set((h.x + b.x) / 2, 1.2, (h.z + b.z) / 2);
+    chainM.rotation.set(0, Math.atan2(dx, dz), 0);
+    chainM.scale.set(0.12, 0.12, d);
+  } else {
+    if (h.chainT > 0 && (!b || h.dead)) h.chainT = 0;
+    chainM.visible = false;
+  }
+}
+function princeClear2() {
+  for (const c of cuts) {
+    c.t = 0;
+    c.m.visible = false;
+  }
+  for (const p of pillars) {
+    p.on = false;
+    p.g.visible = false;
+  }
+  orbitOn = false;
+  for (const m of orbit) m.visible = false;
+  chainM.visible = false;
+  hero.chainT = 0;
+  ptS.length = 0;
+  ptMesh.visible = false;
+}
+
 /* ---------- zasady walki ---------- */
+const PHASES = [
+  null,
+  { name: 'Szermierz Zmierzchu' },
+  {
+    name: 'Taniec cieni',
+    hint: 'Książę dzieli się na trzy postacie. Tylko ta ze złotą koroną jest prawdziwa.',
+  },
+  { name: 'Krwawy księżyc', hint: 'Pęknięcia ziemi wyrzucają ogień. Nie stój na świecących liniach.' },
+  {
+    name: 'Wieczna noc',
+    hint: 'Przed Pochłonięciem schowaj się w słupie światła. Łańcuch zerwiesz unikiem.',
+  },
+  { name: 'Ostatnie tchnienie', hint: 'Wokół Księcia krążą miecze, a cięcia przecinają całą arenę.' },
+];
 function princePhase(u) {
   const f = u.hp / u.maxHp;
-  return f > 0.7 ? 1 : f > 0.4 ? 2 : 3;
+  return f > 0.8 ? 1 : f > 0.6 ? 2 : f > 0.4 ? 3 : f > 0.2 ? 4 : 5;
 }
 function princeImmune(u) {
   return u.invT > 0 || !!u.vanish;
 }
+// cios mieczem w postawę riposty: parowanie i kontra (wywoływane z heroStrike)
+function princeParry(u) {
+  const a = u.act;
+  if (!a || a.kind !== 'riposte' || a.parried) return;
+  a.parried = true;
+  a.ct = a.t + 0.28;
+  dmgNum(u.x, u.h + 0.8, u.z, 'sparowane!', 'crit');
+  burst(u.x, 2.2, u.z, 0xffe0a0, 16, 6, 0.1, 0.4);
+  flash(u.x, 2, u.z, 0xffe0a0, 1.6, 0.25, 8);
+  telegraph(u.x, u.z, 4.4, 0.28);
+  sfx.block();
+}
 function princeStartPhase(u, ph) {
-  u.act = null;
-  u.cd = 0.6;
+  // przerwany taniec cieni: Książę wraca na widok, a pozostałe cienie znikają
+  u.vanish = false;
+  u.dash = null;
+  for (const sh of units)
+    if (sh.def.shade && !sh.dead) {
+      burst(sh.x, 2, sh.z, 0x5a2a6a, 20, 4, 0.16, 0.6, -1);
+      die(sh, true);
+    }
+  u.act = { kind: 'roar', t: 0, ph };
+  u.invT = 2.2;
+  u.cd = 1;
   princeClear();
-  waveFx(u.x, u.z, 0.6, 9, PRINCE_C, 0.8);
-  burst(u.x, 2.5, u.z, PRINCE_C, 50, 9, 0.2, 1.1);
-  flash(u.x, 3, u.z, PRINCE_C, 3, 0.8, 18);
-  shake(0.9);
-  sfx.boss();
-  const dx = hero.x - u.x,
-    dz = hero.z - u.z,
-    d = Math.hypot(dx, dz) || 1;
-  if (!hero.dead && d < 7) {
-    hero.kx += (dx / d) * 18;
-    hero.kz += (dz / d) * 18;
-  }
-  if (ph === 2) {
-    banner('Zaćmienie', 'Mrok gęstnieje, a z cienia wychodzą upiory. Trzymaj się światła.', 2.8);
-    u.act = { kind: 'eclipse', t: 0 };
-  } else {
-    banner('Krwawy księżyc', 'Książę jest szybszy, a jego ogień zostaje na ziemi.', 2.8);
-    u.invT = 1.2;
-  }
+  for (const c of cuts) c.t = 0;
+  hero.chainT = 0;
+  slowmo = Math.max(slowmo, 0.5);
+  if (ph === 5)
+    for (const p of pillars) {
+      p.on = false;
+      p.g.visible = false;
+    }
+  const P = PHASES[ph];
+  banner('Faza ' + ph + ': ' + P.name, P.hint || '', 3);
 }
 function princeChoose(u, d) {
-  const r = Math.random(),
-    ph = u.ph;
-  if (ph >= 3 && u.meteorCd <= 0 && r < 0.35) return { kind: 'meteors', t: 0, n: 0 };
-  if (d > 7 && u.dashCd <= 0) return { kind: 'dash', t: 0 };
-  if (ph >= 2 && d > 4.5 && r < 0.5) return { kind: 'blades', t: 0 };
-  if (d < 4.8)
-    return r < 0.42
-      ? { kind: 'sweep', t: 0, n: 0 }
-      : r < 0.75
-        ? { kind: 'combo', t: 0, n: 0 }
-        : { kind: 'quake', t: 0 };
-  return r < 0.55
-    ? { kind: 'quake', t: 0 }
-    : u.dashCd <= 0
-      ? { kind: 'dash', t: 0 }
-      : { kind: 'blades', t: 0 };
+  const ph = u.ph,
+    w = [];
+  const add = (kind, wt, ok) => {
+    if (ok !== false) w.push([kind, wt]);
+  };
+  const near = d < 4.8;
+  add('sweep', near ? 3 : 0.4);
+  add('combo', near ? 2.5 : 0.3, ph !== 5);
+  add('thrust', d < 8 ? 1.6 : 0.5);
+  add('quake', 1.6);
+  add('riposte', near ? 1.2 : 0.2, ph <= 4 && u.ripCd <= 0);
+  add('dash', d > 6 ? 2.5 : 0.6, u.dashCd <= 0);
+  add('blades', d > 4 ? 1.6 : 0.6, ph >= 2);
+  add('dance', 2.2, ph === 2 && u.danceCd <= 0);
+  add('fissures', 1.8, ph >= 3 && u.fisCd <= 0);
+  add('meteors', 1.3, ph >= 3 && u.meteorCd <= 0);
+  add('devour', 3, ph === 4 && u.devCd <= 0);
+  add('chain', 1.6, ph >= 4 && u.chainCd <= 0 && d > 4);
+  add('worldcut', 2.6, ph === 5 && u.cutCd <= 0);
+  add('spiral', 1.6, ph === 5 && u.spiralCd <= 0);
+  let sum = 0;
+  for (const x of w) sum += x[1];
+  let r = Math.random() * sum;
+  for (const x of w) {
+    r -= x[1];
+    if (r <= 0) return { kind: x[0], t: 0, n: 0 };
+  }
+  return { kind: 'sweep', t: 0, n: 0 };
 }
 function princeHitCone(u, arc, r, dmg, kb) {
   if (!hero.dead && inCone(hero.x, hero.z, u.x, u.z, u.face, arc, r + hero.r)) hurt(hero, dmg, u.x, u.z, kb);
@@ -436,10 +723,13 @@ function princeHitCone(u, arc, r, dmg, kb) {
     if (g.team === 0 && !g.dead && inCone(g.x, g.z, u.x, u.z, u.face, arc, r + g.r))
       hurt(g, dmg, u.x, u.z, kb);
 }
+function hitLine(x0, z0, x1, z1, w, dmg, kb) {
+  if (!hero.dead && segD(hero.x, hero.z, x0, z0, x1, z1) < w / 2 + hero.r * 0.5) hurt(hero, dmg, x0, z0, kb);
+}
 function princeAct(u, a, dt) {
   const t = a.t,
     ph = u.ph,
-    fast = ph === 3 ? 0.78 : 1;
+    fast = ph >= 3 ? 0.82 : 1;
   const faceHero = () => {
     if (!hero.dead) u.face = Math.atan2(hero.x - u.x, hero.z - u.z);
   };
@@ -447,10 +737,36 @@ function princeAct(u, a, dt) {
     u.act = null;
     u.cd = cd * fast;
   };
-  if (a.kind === 'sweep') {
-    // zamach w stożku; od fazy 2 drugi zamach w przeciwną stronę
-    const W = 0.8 * fast;
-    if (a.n === 0 && t === dt) {
+  const first = t === dt;
+  if (a.kind === 'roar') {
+    // przejście fazy: ryk, uniesiony miecz i fala odpychająca
+    if (!a.done && t >= 0.7) {
+      a.done = true;
+      waveFx(u.x, u.z, 0.6, 10, PRINCE_C, 0.9);
+      waveFx(u.x, u.z, 0.4, 6, 0xffffff, 0.6);
+      burst(u.x, 3, u.z, PRINCE_C, 60, 10, 0.2, 1.2);
+      flash(u.x, 3, u.z, PRINCE_C, 3.2, 0.9, 20);
+      shake(1);
+      sfx.boss();
+      const dx = hero.x - u.x,
+        dz = hero.z - u.z,
+        d = Math.hypot(dx, dz) || 1;
+      if (!hero.dead && d < 8) {
+        hero.kx += (dx / d) * 18;
+        hero.kz += (dz / d) * 18;
+      }
+      if (a.ph === 4) princePillars(u);
+      if (a.ph === 5) orbitOn = true;
+    }
+    if (t >= 1.7) {
+      u.act = a.ph === 2 ? { kind: 'dance', t: 0, n: 0 } : a.ph === 4 ? { kind: 'devour', t: 0, n: 0 } : null;
+      u.cd = 0.6;
+    }
+  } else if (a.kind === 'sweep') {
+    // zamach w stożku; od fazy 2 drugi w przeciwną stronę
+    const W = 0.8 * fast,
+      twice = ph >= 2;
+    if (a.n === 0 && first) {
       faceHero();
       coneTele(u.x, u.z, u.face, 2.4, 4.8, W);
       sfx.wail();
@@ -461,21 +777,21 @@ function princeAct(u, a, dt) {
       slashFx(u.x, u.z, u.face, 1, 1.85, 0xff8090);
       sfx.sweep();
       shake(0.4);
-      if (ph >= 2) {
+      if (twice) {
         faceHero();
         coneTele(u.x, u.z, u.face, 2.4, 4.8, 0.5 * fast);
       }
     }
-    if (ph >= 2 && a.n === 1 && t >= W + 0.5 * fast) {
+    if (twice && a.n === 1 && t >= W + 0.5 * fast) {
       a.n = 2;
       princeHitCone(u, 2.4, 4.8, u.dmg, 12);
       slashFx(u.x, u.z, u.face, -1, 1.85, 0xff8090);
       sfx.sweep();
       shake(0.4);
     }
-    if (t >= W + (ph >= 2 ? 1.1 : 0.55) * fast) end(1.1);
+    if (t >= W + (twice ? 1.1 : 0.55) * fast) end(1.1);
   } else if (a.kind === 'combo') {
-    // trzy szybkie cięcia z wypadem do przodu
+    // trzy szybkie cięcia z wypadem
     const step = 0.5 * fast;
     if (t >= a.n * step && a.n < 3 && !a.tele) {
       faceHero();
@@ -492,10 +808,58 @@ function princeAct(u, a, dt) {
       sfx.swing(a.n === 3);
     }
     if (a.n >= 3 && t >= 3 * step + 0.3) end(1.2);
+  } else if (a.kind === 'thrust') {
+    // pchnięcie: długa, wąska linia i wypad do przodu
+    const W = 0.65 * fast,
+      len = 7.5;
+    if (first) {
+      faceHero();
+      a.dx = Math.sin(u.face);
+      a.dz = Math.cos(u.face);
+    }
+    if (t < W) lineTele(u.x, u.z, u.x + a.dx * len, u.z + a.dz * len, t / W, 1.5);
+    else if (!a.done) {
+      a.done = true;
+      const x0 = u.x,
+        z0 = u.z;
+      hitLine(x0, z0, x0 + a.dx * len, z0 + a.dz * len, 1.5, u.dmg * 0.9, 12);
+      moveCircle(u, a.dx * 4, a.dz * 4);
+      cutFx(x0, z0, x0 + a.dx * len, z0 + a.dz * len, 0.5);
+      burst(u.x + a.dx * 2, 1.2, u.z + a.dz * 2, 0xff8090, 14, 6, 0.1, 0.4);
+      sfx.sweep();
+      shake(0.35);
+    }
+    if (t >= W + 0.6) end(1.0);
+  } else if (a.kind === 'riposte') {
+    // postawa riposty: cios mieczem zostanie sparowany i oddany obrotem; jeśli nikt nie uderzy, Książę pchnie
+    if (first) {
+      faceHero();
+      sfx.wail();
+    }
+    if (a.parried) {
+      if (!a.cdone && t >= a.ct) {
+        a.cdone = true;
+        if (!hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < 4.4 + hero.r)
+          hurt(hero, u.dmg * 1.3, u.x, u.z, 16);
+        waveFx(u.x, u.z, 0.6, 4.4, 0xffe0a0, 0.35);
+        slashFx(u.x, u.z, u.face, 1, 1.75, 0xffe0a0);
+        slashFx(u.x, u.z, u.face + Math.PI, 1, 1.75, 0xffe0a0);
+        sfx.sweep();
+        shake(0.6);
+      }
+      if (t >= a.ct + 0.6) {
+        u.ripCd = 7;
+        end(0.8);
+      }
+    } else if (t >= 2.2) {
+      u.ripCd = 7;
+      u.act = { kind: 'thrust', t: 0, n: 0 };
+    }
   } else if (a.kind === 'quake') {
-    // uderzenie w ziemię i rosnące pierścienie (od fazy 2 dwa, w fazie 3 trzy)
-    const W = 0.9 * fast;
-    if (t === dt) {
+    // uderzenie w ziemię i rosnące pierścienie (liczba rośnie z fazą)
+    const W = 0.9 * fast,
+      rings = Math.min(3, Math.ceil(ph / 1.6));
+    if (first) {
       telegraph(u.x, u.z, 3, W);
       sfx.wail();
     }
@@ -512,7 +876,7 @@ function princeAct(u, a, dt) {
       if (!hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < 3 + hero.r * 0.5)
         hurt(hero, u.dmg, u.x, u.z, 13);
     }
-    if (a.done && a.rings < ph && t >= W + a.rings * 0.55) {
+    if (a.done && a.rings < rings && t >= W + a.rings * 0.55) {
       const q = quakes.find(q => q.t <= 0);
       if (q) {
         q.x = u.x;
@@ -526,18 +890,18 @@ function princeAct(u, a, dt) {
       a.rings++;
       if (a.rings > 1) sfx.quake();
     }
-    if (t >= W + ph * 0.55 + 0.4) end(1.3);
+    if (t >= W + rings * 0.55 + 0.4) end(1.3);
   } else if (a.kind === 'dash') {
-    // szarża po linii; w fazie 3 zostawia za sobą ogień
+    // szarża; od fazy 3 zostawia ogień
     const W = 0.75 * fast,
       len = 12;
-    if (t === dt) {
+    if (first) {
       faceHero();
       a.dx = Math.sin(u.face);
       a.dz = Math.cos(u.face);
       sfx.wail();
     }
-    if (t < W) aimLine(u.x, u.z, u.x + a.dx * len, u.z + a.dz * len, t / W, 2.2, 0.07);
+    if (t < W) lineTele(u.x, u.z, u.x + a.dx * len, u.z + a.dz * len, t / W, 2.2);
     else {
       if (!a.go) {
         a.go = true;
@@ -552,7 +916,7 @@ function princeAct(u, a, dt) {
         moveCircle(u, a.dx * st, a.dz * st);
         a.left = Math.hypot(u.x - ox, u.z - oz) < st * 0.3 ? 0 : a.left - st;
         burst(u.x, 1.2, u.z, PRINCE_C, 2, 1.2, 0.14, 0.4, 0);
-        if (ph === 3) {
+        if (ph >= 3) {
           a.trail += st;
           if (a.trail > 1.6) {
             a.trail = 0;
@@ -573,13 +937,13 @@ function princeAct(u, a, dt) {
       }
     }
   } else if (a.kind === 'blades') {
-    // rzucane ostrza (3, w fazie 3 pięć)
+    // rzucane ostrza (3, od fazy 3 pięć)
     const W = 0.55 * fast,
-      n = ph === 3 ? 5 : 3,
-      spread = ph === 3 ? 1.0 : 0.6;
-    if (t === dt) faceHero();
+      n = ph >= 3 ? 5 : 3,
+      spread = ph >= 3 ? 1.0 : 0.6;
+    if (first) faceHero();
+    const base = Math.atan2(hero.x - u.x, hero.z - u.z);
     if (t < W) {
-      const base = Math.atan2(hero.x - u.x, hero.z - u.z);
       for (let q = 0; q < n; q++) {
         const ang = base - spread / 2 + (spread * q) / (n - 1);
         aimLine(
@@ -594,7 +958,6 @@ function princeAct(u, a, dt) {
       }
     } else if (!a.done) {
       a.done = true;
-      const base = Math.atan2(hero.x - u.x, hero.z - u.z);
       for (let q = 0; q < n; q++) {
         const ang = base - spread / 2 + (spread * q) / (n - 1);
         shoot(
@@ -612,46 +975,141 @@ function princeAct(u, a, dt) {
       sfx.sweep();
     }
     if (t >= W + 0.5) end(1.1);
-  } else if (a.kind === 'eclipse') {
-    // Książę znika w mroku, z cienia wychodzą upiory, po chwili wraca uderzeniem
-    if (t === dt) {
+  } else if (a.kind === 'dance') {
+    // taniec cieni: trzy postacie na okręgu wokół bohatera szarżują po kolei; prawdziwa ma koronę
+    if (first) {
       u.vanish = true;
       burst(u.x, 2, u.z, 0x2a0a14, 40, 6, 0.2, 1.0, -1);
-      for (let k = 0; k < 4; k++) {
-        const ang = (k / 4) * TAU + rnd(0.5),
-          x = hero.x + Math.sin(ang) * 6,
-          z = hero.z + Math.cos(ang) * 6;
-        if (!canStand(x, z, 0.45)) continue;
-        const m = makeUnit('wraith', x, z, null);
-        m.minionOf = u;
-        m.spawnT = m.spawnDur = 0.6;
-        burst(x, 0.5, z, PRINCE_C, 10, 3, 0.12, 0.6, -2);
-      }
-    }
-    if (t >= 4.5 && u.vanish) {
-      u.vanish = false;
-      for (let k = 0; k < 14; k++) {
-        const ang = rnd(TAU),
-          r = rnd(3, 4.5),
-          x = hero.x + Math.sin(ang) * r,
-          z = hero.z + Math.cos(ang) * r;
-        if (canStand(x, z, 0.6) && fieldHero[cellOf(x, z)] >= 0) {
-          u.x = x;
-          u.z = z;
-          break;
+      sfx.wail();
+      const real = (Math.random() * 3) | 0,
+        a0 = rnd(TAU);
+      a.spots = [];
+      for (let k = 0; k < 3; k++) {
+        let x = hero.x,
+          z = hero.z;
+        for (let tr = 0; tr < 10; tr++) {
+          const ang = a0 + (k * TAU) / 3 + rnd(-0.3, 0.3),
+            r = rnd(6, 7.5);
+          if (canStand(hero.x + Math.sin(ang) * r, hero.z + Math.cos(ang) * r, 0.6)) {
+            x = hero.x + Math.sin(ang) * r;
+            z = hero.z + Math.cos(ang) * r;
+            break;
+          }
         }
+        a.spots.push({ x, z, real: k === real });
       }
-      burst(u.x, 2, u.z, PRINCE_C, 30, 7, 0.18, 0.8);
-      u.act = { kind: 'quake', t: 0 };
+      a.order = [0, 1, 2].sort(() => Math.random() - 0.5);
+      a.shades = [];
+      for (const s of a.spots) {
+        if (s.real) continue;
+        const sh = makeUnit('shade', s.x, s.z, null);
+        sh.spawnT = sh.spawnDur = 0.5;
+        sh.face = Math.atan2(hero.x - s.x, hero.z - s.z);
+        sh.minionOf = u;
+        a.shades.push(sh);
+        s.unit = sh;
+      }
     }
+    if (t >= 0.6 && u.vanish && !a.placed) {
+      a.placed = true;
+      const s = a.spots.find(s => s.real);
+      u.x = s.x;
+      u.z = s.z;
+      u.vanish = false;
+      u.invT = 0;
+      faceHero();
+      burst(u.x, 2, u.z, PRINCE_C, 20, 5, 0.16, 0.6);
+    }
+    // kolejne szarże co 1,1 s
+    const turn = Math.floor((t - 0.9) / 1.1);
+    if (t >= 0.9 && turn < 3 && turn >= a.n) {
+      a.n = turn + 1;
+      const s = a.spots[a.order[turn]];
+      const who = s.real ? u : s.unit;
+      if (who && !who.dead) {
+        const dx = hero.x - who.x,
+          dz = hero.z - who.z,
+          d = Math.hypot(dx, dz) || 1;
+        who.dash = { dx: dx / d, dz: dz / d, t: 0, len: d + 4, go: false };
+      }
+    }
+    for (const s of a.spots) {
+      const who = s.real ? u : s.unit;
+      if (!who || who.dead || !who.dash) continue;
+      const q = who.dash;
+      q.t += dt;
+      if (q.t < 0.7) lineTele(who.x, who.z, who.x + q.dx * q.len, who.z + q.dz * q.len, q.t / 0.7, 2);
+      else {
+        if (!q.go) {
+          q.go = true;
+          sfx.dash();
+        }
+        if (q.len > 0) {
+          const st = Math.min(q.len, 26 * dt);
+          moveCircle(who, q.dx * st, q.dz * st);
+          q.len -= st;
+          who.face = Math.atan2(q.dx, q.dz);
+          burst(who.x, 1.2, who.z, s.real ? PRINCE_C : 0x5a2a6a, 2, 1, 0.12, 0.4, 0);
+          if (!q.hit && !hero.dead && Math.hypot(hero.x - who.x, hero.z - who.z) < 1.6 + hero.r) {
+            q.hit = true;
+            hurt(hero, u.dmg * 0.9, who.x - q.dx, who.z - q.dz, 12);
+          }
+        } else who.dash = null;
+      }
+    }
+    if (t >= 0.9 + 3 * 1.1 + 0.6) {
+      for (const sh of a.shades)
+        if (!sh.dead) {
+          burst(sh.x, 2, sh.z, 0x5a2a6a, 20, 4, 0.16, 0.6, -1);
+          die(sh, true);
+        }
+      u.dash = null;
+      u.danceCd = 13;
+      end(1.0);
+    }
+  } else if (a.kind === 'fissures') {
+    // pęknięcia: pięć linii ognia rozchodzących się od Księcia
+    const W = 1.0 * fast;
+    if (first) {
+      a.ang = Math.atan2(hero.x - u.x, hero.z - u.z);
+      sfx.wail();
+    }
+    const lines = [];
+    for (let k = 0; k < 5; k++) {
+      const ang = a.ang + (k * TAU) / 5;
+      lines.push([
+        u.x + Math.sin(ang) * 1.6,
+        u.z + Math.cos(ang) * 1.6,
+        u.x + Math.sin(ang) * 13,
+        u.z + Math.cos(ang) * 13,
+      ]);
+    }
+    if (t < W) for (const l of lines) lineTele(l[0], l[1], l[2], l[3], t / W, 1.4);
+    else if (!a.done) {
+      a.done = true;
+      for (const l of lines) {
+        hitLine(l[0], l[1], l[2], l[3], 1.4, u.dmg * 0.8, 8);
+        for (let k = 0; k <= 6; k++) {
+          const x = lerp(l[0], l[2], k / 6),
+            z = lerp(l[1], l[3], k / 6);
+          if (walkAt(x, z)) fireZone(x, z, 0.9, 3.5);
+        }
+        cutFx(l[0], l[1], l[2], l[3], 0.6);
+      }
+      sfx.quake();
+      shake(0.6);
+      u.fisCd = 9;
+    }
+    if (t >= W + 0.6) end(1.0);
   } else if (a.kind === 'meteors') {
     // deszcz meteorów wokół bohatera
-    if (t >= a.n * 0.28 && a.n < 7) {
-      const first = a.n === 0,
+    const count = ph >= 5 ? 9 : 7;
+    if (t >= a.n * 0.28 && a.n < count) {
+      const f0 = a.n === 0,
         ang = rnd(TAU),
-        r = first ? 0 : rnd(1.5, 4),
-        x = hero.x + Math.sin(ang) * r + (first ? hero.vx * 0.5 : 0),
-        z = hero.z + Math.cos(ang) * r + (first ? hero.vz * 0.5 : 0),
+        r = f0 ? 0 : rnd(1.5, 4),
+        x = hero.x + Math.sin(ang) * r + (f0 ? hero.vx * 0.5 : 0),
+        z = hero.z + Math.cos(ang) * r + (f0 ? hero.vz * 0.5 : 0),
         m = meteors.find(m => m.t <= 0);
       if (m) {
         m.x = x;
@@ -662,11 +1120,177 @@ function princeAct(u, a, dt) {
       }
       a.n++;
     }
-    if (a.n >= 7 && t >= 7 * 0.28 + 1.2) {
+    if (a.n >= count && t >= count * 0.28 + 1.2) {
       u.meteorCd = 9;
       end(1.0);
     }
+  } else if (a.kind === 'devour') {
+    // Pochłonięcie: tylko w słupie światła jest bezpiecznie; unik nie chroni
+    const W = 3.2;
+    if (first) {
+      if (!pillars.some(p => p.on)) princePillars(u);
+      telegraph(u.x, u.z, 14, W);
+      sfx.wail();
+      banner('Pochłonięcie!', 'Schowaj się w słupie światła.', 2);
+    }
+    if (t < W && Math.random() < 0.7) {
+      const ang = rnd(TAU),
+        r = rnd(5, 10);
+      burst(u.x + Math.sin(ang) * r, 0.5, u.z + Math.cos(ang) * r, 0x2a0a14, 1, 2, 0.2, 0.6, -2);
+    }
+    if (!a.done && t >= W) {
+      a.done = true;
+      waveFx(u.x, u.z, 1, 15, 0x200008, 0.8);
+      waveFx(u.x, u.z, 0.6, 12, PRINCE_C, 0.6);
+      flash(u.x, 2, u.z, 0x400010, 3, 0.8, 30);
+      shake(1);
+      sfx.boom();
+      if (!hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) < 14 && !inPillar(hero.x, hero.z)) {
+        hero.rollT = 0;
+        hero.inv = 0;
+        hurt(hero, hero.maxHp * 0.55, u.x, u.z, 10);
+      }
+      for (const g of units) if (g.team === 0 && !g.dead && !inPillar(g.x, g.z)) hurt(g, 999, u.x, u.z, 0);
+      // słupy przenoszą się na nowe miejsca na następny raz
+      princePillars(u);
+    }
+    if (t >= W + 0.8) {
+      u.devCd = 14;
+      end(1.2);
+    }
+  } else if (a.kind === 'chain') {
+    // łańcuch: jeśli trafi, przyciąga bohatera, dopóki ten nie zrobi uniku
+    const W = 0.8 * fast;
+    if (first) {
+      faceHero();
+      a.dx = Math.sin(u.face);
+      a.dz = Math.cos(u.face);
+      a.len = Math.min(12, Math.hypot(hero.x - u.x, hero.z - u.z) + 2);
+    }
+    if (t < W) lineTele(u.x, u.z, u.x + a.dx * a.len, u.z + a.dz * a.len, t / W, 0.9);
+    else if (!a.done) {
+      a.done = true;
+      sfx.dash();
+      cutFx(u.x, u.z, u.x + a.dx * a.len, u.z + a.dz * a.len, 0.2);
+      if (
+        !hero.dead &&
+        hero.rollT <= 0 &&
+        hero.inv <= 0 &&
+        segD(hero.x, hero.z, u.x, u.z, u.x + a.dx * a.len, u.z + a.dz * a.len) < 0.9
+      ) {
+        hero.chainT = 1.6;
+        dmgNum(hero.x, hero.h + 0.6, hero.z, 'unik zerwie łańcuch!', 'hurt');
+      }
+    }
+    if (t >= W + 0.5) {
+      u.chainCd = 8;
+      // przyciągniętego bohatera czeka zamach
+      u.act = hero.chainT > 0 ? { kind: 'sweep', t: 0, n: 0 } : null;
+      u.cd = 0.6;
+    }
+  } else if (a.kind === 'worldcut') {
+    // cięcia świata: trzy linie przez całą arenę, tuż obok bohatera
+    const W = 1.25;
+    if (first) {
+      a.lines = [];
+      for (let k = 0; k < 3; k++) {
+        const ang = rnd(TAU),
+          off = k === 0 ? 0 : rnd(-3.5, 3.5),
+          px = hero.x + Math.cos(ang) * off,
+          pz = hero.z - Math.sin(ang) * off;
+        a.lines.push([
+          px - Math.sin(ang) * 15,
+          pz - Math.cos(ang) * 15,
+          px + Math.sin(ang) * 15,
+          pz + Math.cos(ang) * 15,
+        ]);
+      }
+      sfx.wail();
+    }
+    if (t < W) for (const l of a.lines) lineTele(l[0], l[1], l[2], l[3], t / W, 1.8);
+    else if (!a.done) {
+      a.done = true;
+      for (const l of a.lines) {
+        hitLine(l[0], l[1], l[2], l[3], 1.8, u.dmg, 12);
+        cutFx(l[0], l[1], l[2], l[3], 0.7);
+      }
+      flash(hero.x, 2, hero.z, 0xffd0d8, 2.4, 0.3, 14);
+      sfx.sweep();
+      shake(0.8);
+    }
+    if (t >= W + 0.5) {
+      u.cutCd = 6;
+      end(0.9);
+    }
+  } else if (a.kind === 'spiral') {
+    // spirala ostrzy w czterech ramionach
+    if (first) sfx.wail();
+    if (t >= 0.5 && t < 2.8 && t >= (a.next || 0.5)) {
+      a.next = t + 0.13;
+      a.ang = (a.ang || 0) + 0.27;
+      for (let k = 0; k < 4; k++) {
+        const ang = a.ang + (k * TAU) / 4;
+        shoot(
+          u.x + Math.sin(ang) * 1.6,
+          u.z + Math.cos(ang) * 1.6,
+          Math.sin(ang),
+          Math.cos(ang),
+          7.5,
+          1,
+          u.dmg * 0.4,
+          'blade'
+        );
+      }
+    }
+    if (t >= 3.1) {
+      u.spiralCd = 9;
+      end(1.2);
+    }
   }
+}
+function princePillars(u) {
+  const a0 = rnd(TAU);
+  pillars.forEach((p, k) => {
+    let x = u.x,
+      z = u.z;
+    for (let tr = 0; tr < 14; tr++) {
+      const ang = a0 + (k * TAU) / 3 + rnd(-0.4, 0.4),
+        r = rnd(5.5, 7.5),
+        px = u.x + Math.sin(ang) * r,
+        pz = u.z + Math.cos(ang) * r;
+      if (canStand(px, pz, 0.8) && fieldHero[cellOf(px, pz)] >= 0) {
+        x = px;
+        z = pz;
+        break;
+      }
+    }
+    p.x = x;
+    p.z = z;
+    p.on = true;
+    p.g.position.set(x, 0, z);
+    p.g.visible = true;
+    burst(x, 1, z, 0xffe08a, 14, 4, 0.12, 0.7, -3);
+  });
+}
+// cienie z tańca: kopie Księcia, które giną od jednego ciosu
+function shadeSkin(root) {
+  root.traverse(o => {
+    if (o.isMesh && o.material === CHAR_MAT) {
+      o.material = SHADE_MAT;
+      o.userData.m = SHADE_MAT;
+    }
+  });
+}
+const SHADE_MAT = new THREE.MeshLambertMaterial({
+  color: 0x3a1a4a,
+  emissive: 0x12051a,
+  transparent: true,
+  opacity: 0.72,
+});
+function updateShade(u, dt) {
+  if (u.spawnT > 0) u.spawnT -= dt;
+  if (Math.random() < 0.3)
+    burst(u.x + rnd(-0.6, 0.6), rnd(0.5, 3), u.z + rnd(-0.6, 0.6), 0x5a2a6a, 1, 0.4, 0.1, 0.7, -1.5);
 }
 function updatePrince(u, dt) {
   if (u.spawnT > 0) {
@@ -677,14 +1301,31 @@ function updatePrince(u, dt) {
     u.ph = 1;
     u.act = null;
     u.invT = 0;
-    u.dashCd = 3;
-    u.meteorCd = 0;
     u.cd = 1.6;
     u.vanish = false;
+    u.dashCd = 3;
+    u.meteorCd = 0;
+    u.ripCd = 4;
+    u.danceCd = 0;
+    u.fisCd = 0;
+    u.devCd = 0;
+    u.chainCd = 3;
+    u.cutCd = 0;
+    u.spiralCd = 4;
   }
-  if (u.invT > 0) u.invT -= dt;
-  if (u.dashCd > 0) u.dashCd -= dt;
-  if (u.meteorCd > 0) u.meteorCd -= dt;
+  for (const k of [
+    'invT',
+    'dashCd',
+    'meteorCd',
+    'ripCd',
+    'danceCd',
+    'fisCd',
+    'devCd',
+    'chainCd',
+    'cutCd',
+    'spiralCd',
+  ])
+    if (u[k] > 0) u[k] -= dt;
   const ph = princePhase(u);
   if (ph > u.ph) {
     u.ph = ph;
@@ -708,7 +1349,7 @@ function updatePrince(u, dt) {
     u.face = angLerp(u.face, Math.atan2(dx, dz), 1 - Math.exp(-6 * dt));
     if (u.cd <= 0 && u.invT <= 0) u.act = princeChoose(u, d);
   }
-  const sp = u.spd * (u.ph === 3 ? 1.25 : 1);
+  const sp = u.spd * (u.ph >= 3 ? 1.2 : 1) * (u.ph === 5 ? 1.1 : 1);
   u.vx = damp(u.vx, mx * sp, 8, dt);
   u.vz = damp(u.vz, mz * sp, 8, dt);
   if (Math.abs(u.vx) + Math.abs(u.vz) > 0.02) moveCircle(u, u.vx * dt, u.vz * dt);
@@ -720,99 +1361,180 @@ function animPrince(u, dt) {
     a = u.act,
     t = a ? a.t : 0,
     sp = Math.hypot(u.vx, u.vz),
-    mv = clamp(sp / u.spd, 0, 1);
-  if (mv > 0.05 || (a && a.kind === 'dash' && a.go)) u.phase += dt * (3 + sp * 1.6);
+    mv = clamp(sp / u.spd, 0, 1),
+    shade = !!u.def.shade,
+    dashing = (a && (a.kind === 'dash' || a.kind === 'thrust') && (a.go || a.done)) || (u.dash && u.dash.go);
+  if (mv > 0.05 || dashing) u.phase += dt * (3 + Math.max(sp, dashing ? 8 : 0) * 1.4);
   const sn = Math.sin(u.phase),
     cs = Math.cos(u.phase),
-    walk = a && a.kind === 'dash' && a.go ? 1 : mv;
+    walk = dashing ? 1 : mv;
+  // ciężkie kroki: pył przy każdym postawieniu stopy
+  const side = sn >= 0 ? 1 : -1;
+  if (side !== u.stepS) {
+    u.stepS = side;
+    if (walk > 0.4 && u.ph !== 5) burst(u.x, 0.1, u.z, theme.dust, 4, 2, 0.16, 0.4, 3);
+  }
   let ar = -0.5,
     er = -0.3,
     al = -0.2 + sn * 0.3 * walk,
     el = -0.4,
+    alz = 0,
+    arz = 0,
     bx = 0.06 + walk * 0.12,
     by = 0,
+    hx = 0,
     y = 0,
-    lam = 12;
+    lam = 12,
+    legBend = 0,
+    trail = false,
+    spin = 0;
   if (a) {
-    if (a.kind === 'sweep') {
-      const W = 0.8 * (u.ph === 3 ? 0.78 : 1);
-      if (t < W) {
-        const k = t / W;
-        ar = -1.4;
-        er = -0.1;
-        by = 0.9 * k * (a.n === 1 ? -1 : 1);
-      } else {
-        ar = -1.4;
-        er = -0.1;
-        by = a.n === 1 ? -0.9 : 0.9;
-        lam = 30;
+    const k = a.kind;
+    if (k === 'roar') {
+      const q = Math.min(1, t / 0.6);
+      ar = al = -1.2 * q;
+      arz = 1.1 * q;
+      alz = -1.1 * q;
+      er = el = 0;
+      bx = -0.35 * q;
+      hx = -0.5 * q;
+      if (t > 0.7 && t < 1.2) {
+        ar = -3;
+        arz = 0.2;
       }
-    } else if (a.kind === 'combo') {
+    } else if (k === 'sweep') {
+      const W = 0.8 * (u.ph >= 3 ? 0.82 : 1);
+      ar = -1.4;
+      er = -0.1;
+      by = t < W ? 0.9 * (t / W) * (a.n === 1 ? -1 : 1) : a.n === 1 ? -0.9 : 0.9;
+      lam = t < W ? 12 : 30;
+      trail = t >= W - 0.05 && t < W + 0.25;
+      legBend = 0.3;
+    } else if (k === 'combo') {
       ar = a.tele ? -2.8 : -0.5;
       er = a.tele ? -0.4 : 0;
       bx = a.tele ? -0.2 : 0.4;
       lam = a.tele ? 10 : 35;
-    } else if (a.kind === 'quake') {
-      const W = 0.9 * (u.ph === 3 ? 0.78 : 1);
+      trail = !a.tele;
+    } else if (k === 'thrust') {
+      ar = a.done ? -1.55 : -1.3;
+      er = a.done ? 0 : -1.4;
+      bx = a.done ? 0.45 : -0.1;
+      by = a.done ? 0 : 0.5;
+      legBend = 0.5;
+      trail = a.done && t < 0.9;
+    } else if (k === 'riposte') {
+      if (a.parried) {
+        spin = Math.min(1, (t - a.ct + 0.28) / 0.45) * TAU;
+        ar = -1.5;
+        trail = true;
+      } else {
+        ar = -1.5;
+        er = -1.2;
+        by = 0.7;
+        legBend = 0.9;
+        y = -0.3;
+        bx = 0.15;
+      }
+    } else if (k === 'quake') {
       if (!a.done) {
         ar = al = -3.0;
         er = el = -0.2;
         bx = -0.3;
-        y = Math.sin(Math.min(1, t / W) * Math.PI) * 0.6;
+        y = Math.sin(Math.min(1, t / 0.9) * Math.PI) * 0.6;
       } else {
         ar = al = -0.5;
         bx = 0.5;
         lam = 30;
+        legBend = 0.6;
       }
-    } else if (a.kind === 'dash') {
+    } else if (k === 'dash') {
       ar = a.go ? 0.6 : -0.9;
       bx = a.go ? 0.55 : 0.2;
-    } else if (a.kind === 'blades') {
+    } else if (k === 'blades') {
       ar = -1.5;
       by = a.done ? -0.7 : 0.7;
       lam = a.done ? 30 : 10;
-    } else if (a.kind === 'meteors') {
-      ar = -3.1;
-      er = 0;
-      al = -2.4;
+      trail = a.done && t < 0.8;
+    } else if (k === 'meteors' || k === 'worldcut') {
+      ar = al = -3.1;
+      er = el = 0;
+      hx = -0.3;
+      if (k === 'worldcut' && a.done) {
+        ar = al = -0.6;
+        bx = 0.5;
+        lam = 30;
+        trail = t < 1.6;
+      }
+    } else if (k === 'fissures') {
+      ar = al = a.done ? -0.4 : -2.9;
+      bx = a.done ? 0.6 : -0.3;
+      legBend = a.done ? 0.8 : 0;
+      lam = a.done ? 30 : 10;
+    } else if (k === 'devour') {
+      ar = al = -2.4;
+      arz = 0.9;
+      alz = -0.9;
+      hx = -0.45;
+      y = Math.min(1.6, t * 0.8);
+    } else if (k === 'chain') {
+      al = a.done ? -1.6 : -0.6;
+      el = 0;
+      by = a.done ? -0.5 : 0.4;
+    } else if (k === 'spiral') {
+      ar = al = -1.6;
+      arz = 0.6;
+      alz = -0.6;
+      spin = t * 5;
     }
   }
-  P.legL.rotation.x = -sn * 0.55 * walk;
-  P.legR.rotation.x = sn * 0.55 * walk;
-  P.kneeL.rotation.x = (0.1 + Math.max(0, cs) * 1.0) * walk;
-  P.kneeR.rotation.x = (0.1 + Math.max(0, -cs) * 1.0) * walk;
+  if (u.dash) {
+    ar = u.dash.go ? 0.6 : -0.9;
+    bx = u.dash.go ? 0.55 : 0.2;
+  }
+  // faza 5: Książę unosi się nad ziemią
+  if (u.ph === 5 && !shade) y += 0.9 + Math.sin(time * 2) * 0.2;
+  P.legL.rotation.x = -sn * 0.55 * walk - legBend * 0.6;
+  P.legR.rotation.x = sn * 0.55 * walk + legBend * 0.2;
+  P.kneeL.rotation.x = (0.1 + Math.max(0, cs) * 1.0) * walk + legBend;
+  P.kneeR.rotation.x = (0.1 + Math.max(0, -cs) * 1.0) * walk + legBend * 0.8;
   P.armR.rotation.x = damp(P.armR.rotation.x, ar, lam, dt);
   P.elbR.rotation.x = damp(P.elbR.rotation.x, er, lam, dt);
   P.armL.rotation.x = damp(P.armL.rotation.x, al, lam, dt);
   P.elbL.rotation.x = damp(P.elbL.rotation.x, el, lam, dt);
+  P.armR.rotation.z = damp(P.armR.rotation.z, arz, lam, dt);
+  P.armL.rotation.z = damp(P.armL.rotation.z, alz, lam, dt);
   P.body.rotation.x = damp(P.body.rotation.x, bx, 10, dt);
-  P.body.rotation.y = damp(
-    P.body.rotation.y,
-    by,
-    a && (a.kind === 'sweep' || a.kind === 'blades') && t > 0.3 ? 26 : 8,
-    dt
-  );
-  P.body.position.y = P.hipY - Math.abs(sn) * 0.08 * walk + Math.sin(time * 1.6 + u.seed) * 0.02;
+  P.body.rotation.y = spin ? spin : damp(P.body.rotation.y, by, a && t > 0.3 ? 26 : 8, dt);
+  P.body.position.y = P.hipY - Math.abs(sn) * 0.08 * walk + Math.sin(time * 1.6 + u.seed) * 0.03;
+  P.head.rotation.x = damp(P.head.rotation.x, hx, 8, dt);
   P.head.rotation.y = a ? 0 : Math.sin(time * 0.6 + u.seed) * 0.25;
-  P.cape.rotation.x = damp(P.cape.rotation.x, 0.15 + walk * 0.5 + Math.sin(time * 2 + u.seed) * 0.06, 6, dt);
-  P.runes.rotation.z += dt * (u.ph === 3 ? 1.5 : 0.5);
-  P.bladeGlow.scale.setScalar(1.4 + Math.sin(time * 5) * 0.2 + (a ? 0.6 : 0));
-  princeRuneMat.opacity = u.ph === 3 ? 1 : 0.75;
-  PRINCE_RIM.value.w = damp(
-    PRINCE_RIM.value.w,
-    (u.ph === 3 ? 0.9 : 0.5) + u.pop * 0.45 + (u.invT > 0 ? 0.8 : 0),
-    4,
+  P.cape.rotation.x = damp(
+    P.cape.rotation.x,
+    0.15 + walk * 0.5 + (u.ph === 5 ? 0.5 : 0) + Math.sin(time * 2 + u.seed) * 0.08,
+    6,
     dt
   );
-  // iskry z ostrza podczas ataku
-  if (a && Math.random() < 0.5) {
-    u.root.updateMatrixWorld(true);
-    P.tip.getWorldPosition(tmpV);
-    burst(tmpV.x, tmpV.y, tmpV.z, 0xff6070, 1, 0.6, 0.1, 0.35, 0);
+  P.runes.rotation.z += dt * (u.ph >= 3 ? 1.5 : 0.5);
+  P.bladeGlow.scale.setScalar(1.4 + Math.sin(time * 5) * 0.2 + (a ? 0.6 : 0));
+  if (!shade) {
+    princeRuneMat.opacity = u.ph >= 3 ? 1 : 0.75;
+    PRINCE_RIM.value.w = damp(
+      PRINCE_RIM.value.w,
+      (u.ph >= 3 ? 0.9 : 0.5) + u.pop * 0.45 + (u.invT > 0 ? 0.8 : 0),
+      4,
+      dt
+    );
+    princeTrail(u, trail, dt);
+    if (a && Math.random() < 0.5) {
+      u.root.updateMatrixWorld(true);
+      P.tip.getWorldPosition(tmpV);
+      burst(tmpV.x, tmpV.y, tmpV.z, 0xff6070, 1, 0.6, 0.1, 0.35, 0);
+    }
+    if (Math.random() < 0.25)
+      burst(u.x + rnd(-0.8, 0.8), 0.3, u.z + rnd(-0.8, 0.8), PRINCE_C, 1, 0.5, 0.08, 1.0, -2.5);
   }
-  if (Math.random() < 0.25)
-    burst(u.x + rnd(-0.8, 0.8), 0.3, u.z + rnd(-0.8, 0.8), PRINCE_C, 1, 0.5, 0.08, 1.0, -2.5);
-  // zaćmienie: Książę rozpływa się w mroku
-  const s = u.vanish ? Math.max(0.01, 1 - Math.min(1, (a ? a.t : 0) * 3)) : 1;
+  // zaćmienie i taniec: Książę rozpływa się w mroku
+  const s = u.vanish ? Math.max(0.01, 1 - Math.min(1, t * 3)) : 1;
   return { s, y };
 }

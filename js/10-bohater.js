@@ -92,6 +92,11 @@ function heroStrike() {
       dz = u.z - h.z,
       d = Math.hypot(dx, dz);
     if (d < range + u.r && (d < 1 || Math.abs(angDiff(h.face, Math.atan2(dx, dz))) < arc / 2)) {
+      // postawa riposty Księcia: cios mieczem zostaje sparowany
+      if (u.def.prince && u.act && u.act.kind === 'riposte' && !u.act.parried) {
+        princeParry(u);
+        continue;
+      }
       const crit = focus || Math.random() < h.critC,
         dmg =
           h.atk *

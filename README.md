@@ -1,6 +1,6 @@
 # Kostkowe Lochy
 
-Przeglądarkowa gra akcji w klockowym 3D. Chodzisz bohaterem po wyspach połączonych mostami, rozbijasz fioletowe kryształy wroga i przejmujesz kapliczki, które potem budzą golemy walczące po twojej stronie. Pięć etapów: Mszysty Gaj, Piaskowe Ruiny, Żarzące Głębie, Upiorne Krypty i Cytadela Mroku. Trzy ostatnie kończą się walką z bossem. W Cytadeli panuje mrok: widać tylko to, co blisko, a Peleryna świetlików poszerza pole widzenia.
+Przeglądarkowa gra akcji w klockowym 3D. Chodzisz bohaterem po wyspach połączonych mostami, rozbijasz fioletowe kryształy wroga i przejmujesz kapliczki, które potem budzą golemy walczące po twojej stronie. Pięć etapów: Mszysty Gaj, Piaskowe Ruiny, Żarzące Głębie, Upiorne Krypty i Cytadela Mroku. Trzy ostatnie kończą się walką z bossem. W Cytadeli panuje mrok: widać tylko to, co blisko. Przejęte kapliczki rozświetlają okolicę, Peleryna świetlików na stałe poszerza pole widzenia, a artefakt Płaszcz cienia na czas działania rozprasza mrok całkowicie. Ostateczny boss, Książę Zmierzchu, ma pięć faz.
 
 **Zagraj:** https://babuuc.github.io/kostkowe-lochy/
 
@@ -54,7 +54,7 @@ js/14-krypty.js       krypty: płyty z kolcami i urny dusz
 js/15-artefakty.js    artefakty w grze (róg, totem, mróz, grom, płaszcz)
 js/16-rozwoj.js       ekran rozwoju bohatera: postać, ulepszenia, talenty, artefakty
 js/17-mrok.js         mrok w ciemnych etapach i pole widzenia
-js/18-ksiaze.js       Książę Zmierzchu: boss etapu 5
+js/18-ksiaze.js       Książę Zmierzchu: ostateczny boss w pięciu fazach
 js/19-start.js        pętla główna i uruchomienie gry
 ```
 

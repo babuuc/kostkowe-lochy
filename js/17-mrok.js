@@ -9,6 +9,7 @@
 const darkCv = $('dark'),
   dctx = darkCv.getContext('2d');
 let darkOn = false,
+  cloakVis = 0,
   darkMul = 1,
   darkFlare = 0,
   flareT = 8;
@@ -29,6 +30,7 @@ function darkRad(x, z, r) {
   return Math.hypot(b[0] - ax, b[1] - ay);
 }
 function darkHole(x, z, r, soft) {
+  if (!isFinite(x) || !isFinite(z) || !isFinite(r)) return;
   const R = darkRad(x, z, r),
     p = darkScreen(x, 0.6, z),
     px = p[0],
@@ -72,20 +74,32 @@ function updateDark(dt) {
     }
     if (darkFlare > 0) darkFlare -= dt;
     // zaćmienie Księcia zawęża widok, krwawy księżyc go poszerza
-    darkMul = damp(darkMul, pr ? (pr.ph === 2 ? 0.7 : pr.ph === 3 ? 1.3 : 1) : 1, 2, dt);
+    // przed pierwszą klatką walki Książę nie ma jeszcze fazy (ph), wtedy mnożnik wynosi 1
+    darkMul = damp(darkMul, pr ? [1, 1, 0.8, 1.25, 0.6, 1.7][pr.ph || 1] : 1, 2, dt);
+    if (!isFinite(darkMul)) darkMul = 1;
   }
   const sight = h.sight * darkMul + (darkFlare > 0 ? 7 * Math.min(1, darkFlare) : 0),
-    red = pr && pr.ph === 3,
+    red = pr && (pr.ph === 3 || pr.ph === 5),
     W = darkCv.width,
     H = darkCv.height;
   dctx.globalCompositeOperation = 'source-over';
   dctx.clearRect(0, 0, W, H);
-  dctx.fillStyle = red ? 'rgba(30,2,8,0.78)' : 'rgba(3,2,8,0.9)';
+  // Płaszcz cienia: póki działa, mrok się rozprasza (i wraca powoli po jego końcu)
+  cloakVis = damp(cloakVis, h.cloakT > 0 && !h.dead ? 1 : 0, h.cloakT > 0 ? 6 : 1.2, dt);
+  const al = (red ? 0.8 : 0.95) * (1 - cloakVis * 0.94);
+  dctx.fillStyle = red ? 'rgba(30,2,8,' + al.toFixed(3) + ')' : 'rgba(3,2,8,' + al.toFixed(3) + ')';
   dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
-  if (!h.dead) darkHole(h.x, h.z, sight, 0.6);
+  if (!h.dead) darkHole(h.x, h.z, sight, 0.55);
   else darkHole(camT.x, camT.z, 5, 0.4);
-  for (const n of nodes) if (n.own === 0) darkHole(n.x, n.z, 7.5, 0.35);
+  for (const n of nodes) if (n.own === 0) darkHole(n.x, n.z, 6.5, 0.35);
+  for (const p of pillars) if (p.on) darkHole(p.x, p.z, PILLAR_R + 1.2, 0.5);
+  for (const l of pLines) {
+    const len = Math.hypot(l.x1 - l.x0, l.z1 - l.z0),
+      n = Math.max(1, Math.ceil(len / 1.6));
+    for (let k = 0; k <= n; k++)
+      darkHole(lerp(l.x0, l.x1, k / n), lerp(l.z0, l.z1, k / n), l.w * 0.5 + 0.7, 0.4);
+  }
   for (const s of lightSrc) if (!s.node && !s.unit && s.d < 32) darkHole(s.x, s.z, 2.6, 0.2);
   for (const t of totems) darkHole(t.x, t.z, t.r + 0.5, 0.5);
   // niebezpieczeństwo jest widoczne zawsze

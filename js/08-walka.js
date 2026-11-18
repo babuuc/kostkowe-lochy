@@ -311,6 +311,7 @@ function die(u, silent) {
     waveFx(u.x, u.z, 1, 12, PRINCE_C, 1.2);
     flash(u.x, 3, u.z, 0xffc0b0, 4.5, 1.4, 24);
     princeClear();
+    princeClear2();
   }
   if (u.def.lich) {
     // dusze uwalniają się z rozbitego Strażnika
@@ -700,6 +701,11 @@ function updateUnit(u, dt) {
     u.vx = u.vz = 0;
     u.state = 'move';
     animUnit(u, 0);
+    return;
+  }
+  if (u.def.shade) {
+    updateShade(u, dt);
+    animUnit(u, dt);
     return;
   }
   if (u.def.prince) {

@@ -1758,3 +1758,21 @@ button.srow.sel {
   height: 100%;
   pointer-events: none;
 }
+
+/* pasek Księcia: pięć faz, znaczniki co 20% */
+#bosshp.five div::before {
+  left: 0;
+  width: 100%;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(20% - 3px),
+    #0b0d12 calc(20% - 3px),
+    #0b0d12 20%
+  );
+}
+#bosshp.five div::after {
+  display: none;
+}

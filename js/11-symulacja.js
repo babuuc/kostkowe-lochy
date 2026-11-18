@@ -133,6 +133,7 @@ function separate() {
 function updateSim(dt) {
   levelTime += dt;
   aimReset();
+  pLines.length = 0;
   fieldT -= dt;
   if (fieldT <= 0) {
     fieldT = 0.25;
@@ -333,6 +334,7 @@ function updateAmbient(dt) {
   updateFx(dt);
   updateBossFx(dt);
   updatePrinceFx(dt);
+  updatePrinceFx2(dt);
   updateDmg(dt);
   updateCorpses(dt);
   updateLights(dt);
