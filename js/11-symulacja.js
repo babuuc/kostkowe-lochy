@@ -152,6 +152,7 @@ function updateSim(dt) {
   for (let i = 0; i < units.length; i++) updateUnit(units[i], dt);
   separate();
   updateTraps(dt);
+  updateArts(dt);
   updateNodes(dt);
   updateProjs(dt);
   updatePickups(dt);

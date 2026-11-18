@@ -15,7 +15,7 @@ const lichPoolMat = new THREE.MeshBasicMaterial({
 
 // Strażnik ma własny materiał: pikselowa faktura jak u innych postaci plus turkusowa poświata krawędzi,
 // dzięki której odcina się od ciemnych krypt. Siła poświaty pulsuje przy trafieniach i zmianie fazy.
-const LICH_RIM = { value: new THREE.Vector4(0.27, 0.94, 0.78, 0.8) };
+const LICH_RIM = { value: new THREE.Vector4(0.27, 0.94, 0.78, 0.55) };
 const LICH_MAT = (function () {
   const m = new THREE.MeshLambertMaterial({ vertexColors: true });
   m.onBeforeCompile = sh => {
@@ -683,7 +683,7 @@ function animLich(u, dt) {
     g.position.set(Math.sin(ang) * 1.25, 1.55 + Math.sin(time * 2 + k) * 0.18, Math.cos(ang) * 1.25);
     g.rotation.y = time * 3;
   });
-  LICH_RIM.value.w = damp(LICH_RIM.value.w, (lichImmune(u) ? 1.3 : 0.8) + u.pop * 1.2, 4, dt);
+  LICH_RIM.value.w = damp(LICH_RIM.value.w, (lichImmune(u) ? 1.1 : 0.55) + u.pop * 0.45, 4, dt);
   {
     const q = 1.4 + glow * 1.1 + Math.sin(time * 6) * 0.15;
     P.orbGlow.scale.set(q, q, 1);

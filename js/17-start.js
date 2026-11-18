@@ -29,6 +29,7 @@ function quality(raw) {
     }
   }
 }
+let renderErr = false;
 function frame(now) {
   requestAnimationFrame(frame);
   const raw = (now - last) / 1000;
@@ -53,7 +54,15 @@ function frame(now) {
   }
   updateAmbient(dt);
   updateCamera(dt);
-  renderer.render(scene, camera);
+  // zabezpieczenie: pojedynczy błąd rysowania nie może zamrozić gry (zostaje zapisany w konsoli raz)
+  try {
+    renderer.render(scene, camera);
+  } catch (e) {
+    if (!renderErr) {
+      renderErr = true;
+      console.error(e);
+    }
+  }
   if (state === 'play') updateHud(dt);
   if (state === 'play' || state === 'menu') music(dt);
 }

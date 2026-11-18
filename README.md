@@ -6,8 +6,12 @@ Przeglądarkowa gra akcji w klockowym 3D. Chodzisz bohaterem po wyspach połącz
 
 ## Rozwój postaci
 
-- **Ulepszenia za odłamki:** Ostrze, Serce, Buty i Golemy, po 8 poziomów. Poziomy 4 i 8 dają dodatkowe premie, na przykład szansę na krytyk, regenerację albo wybuchające golemy.
-- **Talenty za gwiazdki:** każda zdobyta gwiazdka to punkt. Trzy gałęzie (Miecz, Łuk, Dusza) po cztery stopnie; każdy stopień wymaga poprzedniego, a reset jest darmowy.
+Ekran „Rozwój bohatera” (z menu albo z ekranu wyniku etapu) ma cztery zakładki:
+
+- **Postać:** wszystkie liczby bohatera z objaśnieniem, co znaczą i co je zmienia.
+- **Ulepszenia (za odłamki):** Ostrze, Serce, Buty, Kołczan, Amulet dusz i Golemy, po 8 poziomów. Poziomy 4 i 8 dają dodatkowe premie. Przed zakupem widać, które liczby i o ile się zmienią.
+- **Talenty (za gwiazdki):** trzy gałęzie (Miecz, Łuk, Dusza) po cztery stopnie. Każda gwiazdka to punkt, reset jest darmowy.
+- **Artefakty (za odłamki):** Róg golemów, Totem dusz, Mroźny kryształ, Grom i Płaszcz cienia. Mają po 3 poziomy; w grze używasz ich klawiszami R i F (drugie gniazdo od 6 gwiazdek).
 
 ## Sterowanie
 
@@ -19,6 +23,7 @@ Przeglądarkowa gra akcji w klockowym 3D. Chodzisz bohaterem po wyspach połącz
 | Unik | Spacja | przycisk ze strzałkami |
 | Wir ostrzy | Q | niebieska gwiazda |
 | Mikstura | E | przycisk z flakonem |
+| Artefakty | R i F | przyciski nad łukiem |
 | Pauza | Esc lub P | przycisk II |
 
 ## Uruchomienie u siebie
@@ -46,7 +51,9 @@ js/11-symulacja.js    symulacja świata, światła dynamiczne, kamera
 js/12-interfejs.js    HUD, minimapa, menu, ulepszenia, ekran wyniku
 js/13-boss.js         Strażnik Otchłani: boss etapu 4 (model, fazy, ataki)
 js/14-krypty.js       krypty: płyty z kolcami i urny dusz
-js/15-start.js        pętla główna i uruchomienie gry
+js/15-artefakty.js    artefakty w grze (róg, totem, mróz, grom, płaszcz)
+js/16-rozwoj.js       ekran rozwoju bohatera: postać, ulepszenia, talenty, artefakty
+js/17-start.js        pętla główna i uruchomienie gry
 ```
 
 Nowy etap dodaje się w `js/04-dane.js` (tablica `LEVELS`): położenie i promień kapliczek, połączenia mostami oraz lista przeciwników każdej kapliczki.

@@ -471,30 +471,210 @@ const UNIT = {
   },
 };
 
-// Ulepszenia za odłamki: 8 poziomów. Poziomy 4 i 8 dają dodatkową premię (pole m).
+/* ===== Rozwój bohatera =====
+   Ulepszenia (za odłamki): 8 poziomów, premie na poziomie 4 i 8. Liczby same w sobie liczy heroStats() w 06-modele.js.
+   Talenty (za gwiazdki): trzy gałęzie po cztery stopnie.
+   Artefakty (za odłamki): aktywne przedmioty z odnowieniem, 3 poziomy, do dwóch w gniazdach. */
 const UPGRADES = [
   {
     k: 'atk',
     name: 'Ostrze',
-    desc: '+12% obrażeń',
-    m: ['+5% szansy na krytyk', 'krytyk zadaje 2,5× obrażeń'],
+    icon: 'sword',
+    lore: 'Stal hartowana w ogniu dusz. Każdy poziom wyostrza miecz.',
+    per: '+12% obrażeń miecza i +6% obrażeń z łuku',
+    m: ['+5% szansy na cios krytyczny', 'krytyki zadają 2,5× obrażeń zamiast 2×'],
   },
-  { k: 'hp', name: 'Serce', desc: '+18 zdrowia', m: ['mikstura leczy 70%', 'regeneracja 1 pkt/s'] },
+  {
+    k: 'hp',
+    name: 'Serce',
+    icon: 'heart',
+    lore: 'Kamień życia wszyty w napierśnik.',
+    per: '+18 punktów zdrowia',
+    m: ['mikstura leczy 70% zdrowia zamiast 50%', 'regeneracja 1 punktu zdrowia na sekundę'],
+  },
   {
     k: 'agi',
     name: 'Buty',
-    desc: '+3% ruchu, −5% odnowień',
-    m: ['unik co 0,6 s', 'dalszy unik i dłuższa nietykalność'],
+    icon: 'boot',
+    lore: 'Lekkie buty zwiadowcy z podeszwą z kości upiora.',
+    per: '+3% szybkości ruchu i −5% odnowienia umiejętności',
+    m: ['unik odnawia się co 0,6 s zamiast 0,9 s', 'unik sięga o 20% dalej i daje 0,25 s nietykalności'],
+  },
+  {
+    k: 'bow',
+    name: 'Kołczan',
+    icon: 'bow',
+    lore: 'Strzały z grotami z kryształu kapliczek.',
+    per: '+12% obrażeń z łuku',
+    m: [
+      'każda strzała przebija jednego wroga więcej',
+      'strzały lecą o 25% szybciej i mają +15% szansy na krytyk',
+    ],
+  },
+  {
+    k: 'amu',
+    name: 'Amulet dusz',
+    icon: 'star',
+    lore: 'Wisior, w którym krąży uwięziona burza.',
+    per: '+12% obrażeń wiru',
+    m: ['wir odnawia się 2 s szybciej', 'wir uderza drugi raz po chwili (60% siły)'],
   },
   {
     k: 'gol',
     name: 'Golemy',
-    desc: '+20% siły golemów',
-    m: ['3 golemy na kapliczkę', 'golemy wybuchają, gdy giną'],
+    icon: 'golem',
+    lore: 'Runy wyryte w kamieniu kapliczek wzmacniają ich strażników.',
+    per: '+20% zdrowia i obrażeń golemów',
+    m: ['każda kapliczka utrzymuje 3 golemy zamiast 2', 'ginące golemy wybuchają i ranią wrogów wokół'],
   },
 ];
 const UP_MAX = 8;
 const upCost = l => 25 + 20 * l + 5 * l * l;
+const ARTIFACTS = [
+  {
+    id: 'horn',
+    name: 'Róg golemów',
+    icon: 'horn',
+    price: 120,
+    upPrice: [180, 300],
+    desc: 'Dmiesz w róg, a z ziemi obok ciebie wstają kamienne golemy. Idą za tobą i atakują pobliskich wrogów, po czym rozsypują się w pył.',
+    lv: [
+      { cd: 32, n: 2, t: 18, str: 1 },
+      { cd: 28, n: 3, t: 18, str: 1 },
+      { cd: 24, n: 3, t: 24, str: 1.5 },
+    ],
+    lines: v => [
+      'Golemy: ' + v.n + ' na ' + v.t + ' s',
+      'Siła golemów: ' + Math.round(v.str * 100) + '%',
+      'Odnowienie: ' + v.cd + ' s',
+    ],
+  },
+  {
+    id: 'totem',
+    name: 'Totem dusz',
+    icon: 'totem',
+    price: 140,
+    upPrice: [180, 300],
+    desc: 'Wbijasz w ziemię totem, który przez kilka sekund leczy ciebie i twoje golemy w zasięgu. Dobry tam, gdzie trzeba się utrzymać.',
+    lv: [
+      { cd: 26, heal: 7, t: 8, r: 4 },
+      { cd: 23, heal: 9, t: 8, r: 4.5 },
+      { cd: 20, heal: 11, t: 10, r: 5 },
+    ],
+    lines: v => [
+      'Leczenie: ' + v.heal + ' zdrowia na sekundę',
+      'Czas: ' + v.t + ' s, zasięg ' + String(v.r).replace('.', ',') + ' m',
+      'Odnowienie: ' + v.cd + ' s',
+    ],
+  },
+  {
+    id: 'frost',
+    name: 'Mroźny kryształ',
+    icon: 'crystal',
+    price: 160,
+    upPrice: [200, 320],
+    desc: 'Rozbijasz kryształ i zamrażasz wrogów wokół siebie. Zamrożeni nie ruszają się ani nie atakują. Bossowie są odporni na zamrożenie, ale dostają obrażenia.',
+    lv: [
+      { cd: 24, r: 4.5, t: 2.5, dmg: 30 },
+      { cd: 21, r: 5, t: 3, dmg: 45 },
+      { cd: 18, r: 5.5, t: 3.5, dmg: 60 },
+    ],
+    lines: v => [
+      'Zamrożenie: ' + String(v.t).replace('.', ',') + ' s w zasięgu ' + String(v.r).replace('.', ',') + ' m',
+      'Obrażenia: ' + v.dmg,
+      'Odnowienie: ' + v.cd + ' s',
+    ],
+  },
+  {
+    id: 'thunder',
+    name: 'Grom',
+    icon: 'bolt',
+    price: 180,
+    upPrice: [220, 340],
+    desc: 'Przywołujesz pioruny, które trafiają najbliższych wrogów w promieniu 9 metrów. Świetny na łuczników i szamanów trzymających się z tyłu.',
+    lv: [
+      { cd: 20, n: 4, dmg: 50 },
+      { cd: 18, n: 5, dmg: 65 },
+      { cd: 16, n: 6, dmg: 80 },
+    ],
+    lines: v => ['Pioruny: ' + v.n + ' po ' + v.dmg + ' obrażeń', 'Odnowienie: ' + v.cd + ' s'],
+  },
+  {
+    id: 'cloak',
+    name: 'Płaszcz cienia',
+    icon: 'cloak',
+    price: 200,
+    upPrice: [220, 340],
+    desc: 'Rozpływasz się w cieniu: jesteś nietykalny, szybszy o 40%, a wrogowie tracą cię z oczu. Pierwszy cios mieczem z cienia jest krytyczny i kończy działanie płaszcza.',
+    lv: [
+      { cd: 30, t: 2.5 },
+      { cd: 26, t: 3 },
+      { cd: 22, t: 3.5 },
+    ],
+    lines: v => ['Czas: ' + String(v.t).replace('.', ',') + ' s', 'Odnowienie: ' + v.cd + ' s'],
+  },
+];
+const SLOT2_STARS = 6;
+// Dodatkowe opisy do ekranu rozwoju: kategoria, kolor akcentu i wskazówka.
+const UP_EXTRA = {
+  atk: {
+    cat: 'Walka wręcz',
+    col: '#c8463e',
+    tip: 'Najpewniejszy sposób na szybsze rozbijanie kapliczek. Premia z poziomu 4 dobrze łączy się z talentem Egzekucja.',
+  },
+  hp: {
+    cat: 'Przetrwanie',
+    col: '#d8577a',
+    tip: 'Więcej zdrowia to więcej błędów, na które możesz sobie pozwolić. Regeneracja z poziomu 8 leczy też między walkami.',
+  },
+  agi: {
+    cat: 'Ruch',
+    col: '#3f9a5a',
+    tip: 'Krótszy unik to więcej perfekcyjnych uników, a każdy z nich daje pewny cios krytyczny.',
+  },
+  bow: {
+    cat: 'Dystans',
+    col: '#c98a2a',
+    tip: 'Dla graczy, którzy wolą trzymać łuczników i szamanów na dystans. Premia z poziomu 4 sumuje się z talentem Przebicie.',
+  },
+  amu: {
+    cat: 'Umiejętność',
+    col: '#2a9ab8',
+    tip: 'Wir czyści tłum wokół ciebie. Z talentem Burza drugie uderzenie z poziomu 8 trafia przyciągniętych wrogów.',
+  },
+  gol: {
+    cat: 'Sojusznicy',
+    col: '#7a8590',
+    tip: 'Golemy pilnują przejętych kapliczek i bronią ich przed wypadami. Szczególnie przydatne w Upiornych Kryptach.',
+  },
+};
+const BRANCH_DESC = [
+  'walka wręcz i leczenie z ciosów',
+  'strzelanie z dystansu',
+  'wir, mikstury i przetrwanie',
+];
+const TALENT_TIP = {
+  leech: 'Działa przy każdym cięciu, więc najlepiej z Szałem i długą serią.',
+  wave: 'Fala trafia też łuczników stojących za pierwszą linią wrogów.',
+  fury: 'Pilnuj serii: każde przyjęte trafienie ją zeruje.',
+  exec: 'Świetne na bossów w ostatniej fazie walki.',
+  pierce: 'Sumuje się z premią Kołczanu z poziomu 4.',
+  volley: 'Z Przebiciem jedna salwa potrafi trafić kilku wrogów naraz.',
+  quick: 'Razem z Salwą łuk staje się główną bronią.',
+  hunter: 'Przetocz się i od razu strzel. Krytyk z łuku zadaje podwójne obrażenia.',
+  alch: 'Pozwala częściej się leczyć w długich walkach, na przykład z bossem.',
+  storm:
+    'Ściąga wrogów pod kolejne cięcia; z Amuletem na poziomie 8 drugie uderzenie trafia ich jeszcze raz.',
+  second: 'Działa raz na etap, także w walce z bossem.',
+  reaper: 'Przy dużych grupach wir odnawia się niemal od razu.',
+};
+const ART_TIP = {
+  horn: 'Obrona kapliczki przed wypadem albo odciągnięcie wrogów od siebie.',
+  totem: 'Walka z bossem i długie potyczki w jednym miejscu.',
+  frost: 'Tłum przy kryształach i przerywanie zamachów osiłków.',
+  thunder: 'Łucznicy i szamani, do których trudno podejść.',
+  cloak: 'Ucieczka z okrążenia i pewny krytyk na otwarcie walki.',
+};
 // Talenty: każda zdobyta gwiazdka to punkt. Gałąź ma 4 stopnie, a każdy stopień wymaga poprzedniego.
 const BRANCHES = ['Miecz', 'Łuk', 'Dusza'];
 const TALENTS = [
@@ -525,4 +705,19 @@ const TALENTS = [
     desc: 'każdy pokonany wróg skraca odnowienie wiru o 0,6 s',
   },
 ];
+const TALENT_LONG = {
+  leech:
+    'Każde trafienie mieczem leczy cię o 4% zadanych obrażeń. Im mocniej bijesz, tym więcej odzyskujesz.',
+  wave: 'Trzecie cięcie serii wypuszcza falę, która trafia wrogów do 6,5 m przed tobą za 110% obrażeń.',
+  fury: 'Gdy seria trafień wynosi co najmniej 15, przerwa między cięciami jest o 30% krótsza.',
+  exec: 'Ciosy mieczem zadają +60% obrażeń wrogom, którym zostało mniej niż 30% zdrowia. Działa też na bossów.',
+  pierce: 'Każda strzała przelatuje przez dwóch wrogów, zanim się zatrzyma. Kolejne trafienia mają 80% siły.',
+  volley: 'Łuk wypuszcza trzy strzały wachlarzem. Boczne mają 70% siły.',
+  quick: 'Łuk jest gotowy do strzału o 35% szybciej.',
+  hunter: 'Po każdym uniku następna strzała jest krytyczna.',
+  alch: 'Mikstura odnawia się o 30% szybciej.',
+  storm: 'Wir sięga 4,8 m zamiast 3,8 m i przyciąga trafionych wrogów do ciebie.',
+  second: 'Raz na etap śmiertelny cios zostawia cię z 1 punktem zdrowia i 2 sekundami nietykalności.',
+  reaper: 'Każdy pokonany wróg skraca odnowienie wiru o 0,6 s.',
+};
 let TAL = {};

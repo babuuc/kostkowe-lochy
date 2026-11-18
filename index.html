@@ -79,6 +79,12 @@
             <path d="M9 2h6v2h-1v5l4 6v5c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2v-5l4-6V4H9z" /></svg
           ><kbd>E</kbd>
         </button>
+        <button class="act art" id="bArt1" aria-label="Artefakt 1" hidden>
+          <span class="ico"></span><kbd>R</kbd>
+        </button>
+        <button class="act art" id="bArt2" aria-label="Artefakt 2" hidden>
+          <span class="ico"></span><kbd>F</kbd>
+        </button>
       </div>
     </div>
 
@@ -97,15 +103,12 @@
           <p id="stDesc"></p>
           <div class="row"><button class="btn primary" id="playBtn">Graj</button></div>
         </div>
-        <div class="card">
+        <div class="card devcard">
           <div class="shophead">
-            <span class="tabs"
-              ><button class="tab on" id="tabUp">Ulepszenia</button
-              ><button class="tab" id="tabTal">Talenty <small id="talPts"></small></button></span
-            ><span id="gemBox"><i class="gem"></i><span id="menuGems">0</span></span>
+            <span>Rozwój bohatera</span><span><i class="gem"></i><span id="menuGems">0</span></span>
           </div>
-          <div id="upg"></div>
-          <div id="tal" hidden></div>
+          <div class="devsum" id="devSum"></div>
+          <button class="btn primary" id="forgeBtn">Ulepszenia, talenty i artefakty</button>
         </div>
         <div class="foot">
           <span id="ctrlNote"></span
@@ -117,6 +120,29 @@
       </div>
     </div>
 
+    <div id="forge" class="screen" hidden>
+      <div class="fwrap">
+        <header class="fhead">
+          <button class="btn" id="forgeBack">Wróć</button>
+          <h2>Rozwój bohatera</h2>
+          <div id="fToast" role="status"></div>
+          <div class="fres">
+            <span title="Odłamki"><i class="gem"></i><b id="fGems">0</b></span
+            ><span class="fstar" title="Wolne punkty talentów">★ <b id="fPts">0</b></span>
+          </div>
+        </header>
+        <nav class="ftabs" role="tablist">
+          <button class="ftab" role="tab" data-tab="hero">Postać</button
+          ><button class="ftab" role="tab" data-tab="up">Ulepszenia</button
+          ><button class="ftab" role="tab" data-tab="tal">Talenty</button
+          ><button class="ftab" role="tab" data-tab="art">Artefakty</button>
+        </nav>
+        <div class="fbody">
+          <div class="flist" id="fList"></div>
+          <aside class="fdet" id="fDet" aria-live="polite"></aside>
+        </div>
+      </div>
+    </div>
     <div id="pause" class="screen overlay" hidden>
       <div class="card">
         <h2>Pauza</h2>
@@ -142,7 +168,8 @@
         </div>
         <div class="row">
           <button class="btn primary" id="resMain"></button
-          ><button class="btn" id="resMenu">Mapa etapów</button>
+          ><button class="btn" id="resMenu">Mapa etapów</button
+          ><button class="btn" id="resForge">Rozwój</button>
         </div>
       </div>
     </div>
@@ -166,6 +193,8 @@
     <script src="js/12-interfejs.js"></script>
     <script src="js/13-boss.js"></script>
     <script src="js/14-krypty.js"></script>
-    <script src="js/15-start.js"></script>
+    <script src="js/15-artefakty.js"></script>
+    <script src="js/16-rozwoj.js"></script>
+    <script src="js/17-start.js"></script>
   </body>
 </html>

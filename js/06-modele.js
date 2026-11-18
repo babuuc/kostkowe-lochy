@@ -491,7 +491,7 @@ function makeUnit(type, x, z, home) {
         o.castShadow = false;
     });
   u.root.traverse(o => {
-    if (o.isMesh) u.meshes.push(o);
+    if (o.isMesh && o.userData.m) u.meshes.push(o);
   });
   u.pcol = u.parts.col;
   u.lean = u.parts.lean || 0;
@@ -697,7 +697,7 @@ const hero = {
   hero.parts = P;
   hero.frags = bake(root, 'hero');
   root.traverse(o => {
-    if (o.isMesh) hero.meshes.push(o);
+    if (o.isMesh && o.userData.m) hero.meshes.push(o);
   });
   root.visible = false;
   scene.add(root);
@@ -719,27 +719,71 @@ const hero = {
   hero.ring.visible = false;
   scene.add(hero.ring);
 })();
+// Wszystkie liczby bohatera w jednym miejscu: korzysta z nich gra (resetHero) i ekran rozwoju (16-rozwoj.js).
+function heroStats(U, tal) {
+  const T = {};
+  for (const id of tal) T[id] = true;
+  const atk = 14 * (1 + 0.12 * U.atk);
+  return {
+    hp: 100 + 18 * U.hp,
+    atk,
+    crit: 0.12 + (U.atk >= 4 ? 0.05 : 0),
+    critM: U.atk >= 8 ? 2.5 : 2,
+    speed: 6.2 * (1 + 0.03 * U.agi),
+    cdMul: 1 - 0.05 * U.agi,
+    roll: U.agi >= 4 ? 0.6 : 0.9,
+    rollSpd: U.agi >= 8 ? ROLL_SPD * 1.2 : ROLL_SPD,
+    rollInv: U.agi >= 8 ? 0.25 : 0.08,
+    potHeal: U.hp >= 4 ? 0.7 : 0.5,
+    potion: 18 * (T.alch ? 0.7 : 1),
+    regen: U.hp >= 8 ? 1 : 0,
+    bowAtk: 16.1 * (1 + 0.12 * U.bow) * (1 + 0.06 * U.atk),
+    bow: 0.55 * (T.quick ? 0.65 : 1),
+    pierce: (T.pierce ? 2 : 0) + (U.bow >= 4 ? 1 : 0),
+    arrowSpd: U.bow >= 8 ? 32.5 : 26,
+    bowCrit: U.bow >= 8 ? 0.15 : 0,
+    arrows: T.volley ? 3 : 1,
+    spec: 8 - (U.amu >= 4 ? 2 : 0),
+    specDmg: atk * 2.6 * (1 + 0.12 * U.amu),
+    specR: T.storm ? 4.8 : 3.8,
+    spin2: U.amu >= 8,
+    golem: 1 + 0.2 * U.gol,
+    golems: U.gol >= 4 ? 3 : 2,
+    golemBoom: U.gol >= 8,
+    T,
+  };
+}
 function resetHero() {
   const n = nodes[0],
     h = hero;
-  const U = save.up;
-  TAL = {};
-  for (const id of save.tal) TAL[id] = true;
-  h.maxHp = 100 + 18 * U.hp;
-  h.atk = 14 * (1 + 0.12 * U.atk);
-  h.speed = 6.2 * (1 + 0.03 * U.agi);
-  h.cdMul = 1 - 0.05 * U.agi;
-  h.critC = 0.12 + (U.atk >= 4 ? 0.05 : 0);
-  h.critM = U.atk >= 8 ? 2.5 : 2;
-  h.potHeal = U.hp >= 4 ? 0.7 : 0.5;
-  h.regen = U.hp >= 8 ? 1 : 0;
-  h.max.roll = U.agi >= 4 ? 0.6 : 0.9;
-  h.rollSpd = U.agi >= 8 ? ROLL_SPD * 1.2 : ROLL_SPD;
-  h.rollInv = U.agi >= 8 ? 0.25 : 0.08;
-  h.max.bow = 0.55 * (TAL.quick ? 0.65 : 1);
-  h.max.potion = 18 * (TAL.alch ? 0.7 : 1);
+  const S = heroStats(save.up, save.tal);
+  TAL = S.T;
+  h.maxHp = S.hp;
+  h.atk = S.atk;
+  h.speed = S.speed;
+  h.cdMul = S.cdMul;
+  h.critC = S.crit;
+  h.critM = S.critM;
+  h.potHeal = S.potHeal;
+  h.regen = S.regen;
+  h.max.roll = S.roll;
+  h.rollSpd = S.rollSpd;
+  h.rollInv = S.rollInv;
+  h.max.bow = S.bow;
+  h.max.potion = S.potion;
+  h.max.spec = S.spec;
+  h.bowAtk = S.bowAtk;
+  h.pierce = S.pierce;
+  h.arrowSpd = S.arrowSpd;
+  h.bowCrit = S.bowCrit;
+  h.arrows = S.arrows;
+  h.specDmg = S.specDmg;
+  h.specR = S.specR;
+  h.spin2 = S.spin2;
+  h.spin2T = 0;
   h.secondUsed = false;
   h.hunter = false;
+  h.cloakT = 0;
   h.x = n.x;
   h.z = n.z + 2.8;
   h.vx = h.vz = h.kx = h.kz = 0;

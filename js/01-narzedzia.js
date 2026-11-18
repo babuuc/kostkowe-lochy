@@ -49,9 +49,10 @@ const SAVE_KEY = 'kostkowe-lochy-v1';
 let save = {
   unlocked: 1,
   gems: 0,
-  up: { atk: 0, hp: 0, agi: 0, gol: 0 },
+  up: { atk: 0, hp: 0, agi: 0, bow: 0, amu: 0, gol: 0 },
   stars: [0, 0, 0],
   tal: [],
+  art: { own: {}, eq: [null, null] },
   mute: false,
   vib: true,
 };
@@ -62,8 +63,13 @@ try {
     save.gems = Math.max(0, s.gems | 0);
     save.mute = !!s.mute;
     if (s.vib === false) save.vib = false;
+    if (s.art && typeof s.art === 'object') {
+      if (s.art.own) for (const k in s.art.own) save.art.own[k] = clamp(s.art.own[k] | 0, 0, 3);
+      if (Array.isArray(s.art.eq)) save.art.eq = [s.art.eq[0] || null, s.art.eq[1] || null];
+    }
     if (Array.isArray(s.tal)) save.tal = s.tal.filter(x => typeof x === 'string').slice(0, 24);
-    if (s.up) for (const k of ['atk', 'hp', 'agi', 'gol']) save.up[k] = clamp(s.up[k] | 0, 0, 8);
+    if (s.up)
+      for (const k of ['atk', 'hp', 'agi', 'bow', 'amu', 'gol']) save.up[k] = clamp(s.up[k] | 0, 0, 8);
     if (Array.isArray(s.stars))
       for (let i = 0; i < Math.min(s.stars.length, 20); i++) save.stars[i] = clamp(s.stars[i] | 0, 0, 3);
   }

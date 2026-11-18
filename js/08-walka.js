@@ -219,7 +219,7 @@ function spawnBoss(n) {
     z,
     color: bc,
     range: boss.def.lich ? 14 : 12,
-    int: 1.3,
+    int: boss.def.lich ? 0.75 : 1.3,
     flick: true,
     ph: 0,
     d: 0,
@@ -470,7 +470,7 @@ function pickTarget(u) {
       bd = 1e9;
       best = null;
     }
-    if (!hero.dead) consider(hero, 0.8);
+    if (!hero.dead && !(hero.cloakT > 0)) consider(hero, 0.8);
     for (const a of units) if (a.team === 0 && !a.dead) consider(a, 1);
   } else {
     const ag = u.guard ? 9 : u.def.aggro;
@@ -649,6 +649,22 @@ function updateUnit(u, dt) {
     u.flash -= dt;
     if (u.flash <= 0) setFlash(u, false);
   }
+  if (u.ttl !== undefined) {
+    // przyzwany golem rozsypuje się, gdy minie jego czas
+    u.ttl -= dt;
+    if (u.ttl <= 0) {
+      burst(u.x, 0.6, u.z, 0xbfb6a8, 12, 3, 0.14, 0.5);
+      die(u, true);
+      return;
+    }
+  }
+  if (u.frozen > 0) {
+    u.frozen -= dt;
+    u.vx = u.vz = 0;
+    u.state = 'move';
+    animUnit(u, 0);
+    return;
+  }
   if (u.def.lich) {
     updateLich(u, dt);
     animUnit(u, dt);
@@ -763,7 +779,14 @@ function updateUnit(u, dt) {
     } else {
       let moved = false;
       if (u.team === 0) {
-        if (u.guard && u.home) {
+        if (u.summon) {
+          // golem z rogu trzyma się bohatera
+          moved = true;
+          if (!hero.dead && Math.hypot(hero.x - u.x, hero.z - u.z) > 2.6 && fieldDir(fieldHero, u.x, u.z)) {
+            mx = DIR.x;
+            mz = DIR.z;
+          }
+        } else if (u.guard && u.home) {
           const hd = Math.hypot(u.home.x - u.x, u.home.z - u.z);
           if (hd > u.home.R * 0.7 && fieldDir(u.home.field, u.x, u.z)) {
             mx = DIR.x;

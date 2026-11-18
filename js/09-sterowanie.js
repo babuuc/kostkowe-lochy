@@ -161,6 +161,8 @@ window.addEventListener('keydown', e => {
       inp.mouseAim = false;
     } else if (e.code === 'KeyQ' || e.code === 'KeyL') inp.spec = 0.18;
     else if (e.code === 'KeyE') inp.potion = 0.18;
+    else if (e.code === 'KeyR') useArt(0);
+    else if (e.code === 'KeyF') useArt(1);
     else if (e.code === 'Escape' || e.code === 'KeyP') pause(true);
     if (e.code.indexOf('Arrow') === 0) e.preventDefault();
   } else if (state === 'pause' && (e.code === 'Escape' || e.code === 'KeyP')) pause(false);
@@ -224,3 +226,5 @@ bindAct('bSpec', () => {
 bindAct('bPot', () => {
   inp.potion = 0.2;
 });
+bindAct('bArt1', () => useArt(0));
+bindAct('bArt2', () => useArt(1));

@@ -240,9 +240,11 @@ function bake(root, key) {
   });
   return frags;
 }
+// Błysk trafienia: podmienia materiał tylko w częściach modelu (mają zapamiętany materiał w userData.m).
+// Efekty doczepione do postaci (poświata, krąg run, słup światła) są pomijane, bo nie mają do czego wrócić.
 function setFlash(e, on) {
   const a = e.meshes;
-  for (let i = 0; i < a.length; i++) a[i].material = on ? FLASH : a[i].userData.m;
+  for (let i = 0; i < a.length; i++) if (a[i].userData.m) a[i].material = on ? FLASH : a[i].userData.m;
 }
 function shade(hex, l) {
   return tmpC.setHex(hex).offsetHSL(0, 0, l).getHex();

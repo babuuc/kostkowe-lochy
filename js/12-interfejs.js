@@ -57,6 +57,21 @@ function updateHud(dt) {
       c.classList.add('bump');
     } else c.classList.remove('show');
   }
+  for (let k = 0; k < 2; k++) {
+    if (!art.slots[k]) continue;
+    const id = k ? 'bArt2' : 'bArt1',
+      v = clamp(art.cd[k] / art.max[k], 0, 1).toFixed(2);
+    if (cdLast[id] !== v) {
+      const e = $(id);
+      if (v === '0.00' && cdLast[id] !== undefined) {
+        e.classList.remove('ready');
+        void e.offsetWidth;
+        e.classList.add('ready');
+      }
+      cdLast[id] = v;
+      e.style.setProperty('--cd', v);
+    }
+  }
   for (const id in cdEls) {
     const k = cdEls[id][0],
       mx = h.max[k] * (k === 'potion' ? 1 : h.cdMul),
@@ -242,7 +257,6 @@ save.unlocked = clamp(save.unlocked, 1, LEVELS.length);
 save.tal = save.tal.filter((id, i) => TALENTS.some(t => t.id === id) && save.tal.indexOf(id) === i);
 if (talSpent() > talPoints()) save.tal = [];
 let selIdx = save.unlocked - 1;
-let menuTab = 'up';
 function talPoints() {
   return save.stars.reduce((a, b) => a + b, 0);
 }
@@ -251,63 +265,6 @@ function talSpent() {
     const t = TALENTS.find(x => x.id === id);
     return a + (t ? t.cost : 0);
   }, 0);
-}
-function renderTalents() {
-  const el = $('tal'),
-    free = talPoints() - talSpent();
-  el.textContent = '';
-  $('talPts').textContent = free + '/' + talPoints();
-  BRANCHES.forEach((bn, bi) => {
-    const col = document.createElement('div');
-    col.className = 'tcol';
-    col.innerHTML = '<h3>' + bn + '</h3>';
-    for (let t = 0; t < 4; t++) {
-      const T = TALENTS.find(x => x.b === bi && x.t === t),
-        own = save.tal.includes(T.id),
-        prev = t === 0 || save.tal.includes(TALENTS.find(x => x.b === bi && x.t === t - 1).id),
-        can = !own && prev && free >= T.cost;
-      const b = document.createElement('button');
-      b.className = 'tal' + (own ? ' own' : can ? ' can' : ' lock');
-      b.disabled = !can && !own;
-      b.innerHTML =
-        '<b>' +
-        T.name +
-        '</b><small>' +
-        T.desc +
-        '</small><span class="tc">' +
-        (own ? 'aktywny' : T.cost + ' pkt') +
-        '</span>';
-      b.setAttribute(
-        'aria-label',
-        T.name + ': ' + T.desc + (own ? ', aktywny' : ', koszt ' + T.cost + ' pkt')
-      );
-      b.addEventListener('click', () => {
-        if (!can) return;
-        audioInit();
-        save.tal.push(T.id);
-        persist();
-        sfx.heal();
-        renderMenu();
-      });
-      col.appendChild(b);
-    }
-    el.appendChild(col);
-  });
-  const r = document.createElement('button');
-  r.className = 'btn talreset';
-  r.textContent = 'Zresetuj talenty';
-  r.disabled = !save.tal.length;
-  r.addEventListener('click', () => {
-    save.tal = [];
-    persist();
-    sfx.click();
-    renderMenu();
-  });
-  const note = document.createElement('p');
-  note.className = 'talnote';
-  note.textContent = 'Każda zdobyta gwiazdka to punkt talentu. Reset jest darmowy.';
-  el.appendChild(note);
-  el.appendChild(r);
 }
 const starStr = n => '<span>' + '★'.repeat(n) + '</span><span class="off">' + '★'.repeat(3 - n) + '</span>';
 const fmtTime = s => {
@@ -360,52 +317,34 @@ function renderMenu() {
   $('stDesc').textContent = locked ? 'Ukończ etap ' + selIdx + ', aby tu wejść.' : L.desc;
   $('playBtn').disabled = locked;
   $('menuGems').textContent = save.gems;
-  const up = $('upg');
-  up.textContent = '';
-  for (const u of UPGRADES) {
-    const lv = save.up[u.k],
-      maxed = lv >= UP_MAX,
-      cost = upCost(lv);
-    const b = document.createElement('button');
-    b.className = 'up';
-    b.disabled = maxed || save.gems < cost;
-    let pips = '';
-    for (let i = 0; i < UP_MAX; i++)
-      pips += '<i class="' + (i < lv ? 'on' : '') + (i === 3 || i === 7 ? ' ms' : '') + '"></i>';
-    const nm = lv < 4 ? 'poz. 4: ' + u.m[0] : lv < 8 ? 'poz. 8: ' + u.m[1] : 'wszystkie premie';
-    b.innerHTML =
-      '<b>' +
-      u.name +
-      '</b><small>' +
-      u.desc +
-      '</small><span class="lv">' +
-      pips +
-      '</span><em>' +
-      nm +
-      '</em><span class="cost">' +
-      (maxed ? 'maks.' : '<i class="gem"></i>' + cost) +
-      '</span>';
-    b.setAttribute(
-      'aria-label',
-      u.name + ', poziom ' + lv + ' z ' + UP_MAX + (maxed ? '' : ', koszt ' + cost + ' odłamków') + ', ' + nm
+  // podsumowanie rozwoju; pełny ekran ulepszeń jest w 16-rozwoj.js
+  {
+    const S = heroStats(save.up, save.tal),
+      free = talPoints() - talSpent(),
+      ups = UPGRADES.reduce((a, u) => a + save.up[u.k], 0),
+      arts = ARTIFACTS.filter(a => save.art.own[a.id]).length;
+    $('devSum').innerHTML =
+      '<span><b>' +
+      heroPower(S) +
+      '</b><small>moc</small></span><span><b>' +
+      ups +
+      '/' +
+      UPGRADES.length * UP_MAX +
+      '</b><small>ulepszenia</small></span><span><b>' +
+      free +
+      '</b><small>wolne punkty</small></span><span><b>' +
+      arts +
+      '/' +
+      ARTIFACTS.length +
+      '</b><small>artefakty</small></span>';
+    const prices = UPGRADES.filter(u => save.up[u.k] < UP_MAX)
+      .map(u => upCost(save.up[u.k]))
+      .concat(ARTIFACTS.filter(a => !save.art.own[a.id]).map(a => a.price));
+    $('forgeBtn').classList.toggle(
+      'pulse',
+      free > 0 || (prices.length > 0 && save.gems >= Math.min(...prices))
     );
-    b.addEventListener('click', () => {
-      if (save.gems < cost || maxed) return;
-      audioInit();
-      save.gems -= cost;
-      save.up[u.k]++;
-      persist();
-      sfx.heal();
-      renderMenu();
-    });
-    up.appendChild(b);
   }
-  renderTalents();
-  $('tabUp').classList.toggle('on', menuTab === 'up');
-  $('tabTal').classList.toggle('on', menuTab === 'tal');
-  $('upg').hidden = menuTab !== 'up';
-  $('tal').hidden = menuTab !== 'tal';
-  $('gemBox').hidden = menuTab !== 'up';
   $('muteBtn').textContent = save.mute ? 'Dźwięk: wył.' : 'Dźwięk: wł.';
   $('vibBtn').hidden = !(isTouch && canVib);
   $('vibBtn').textContent = save.vib ? 'Wibracje: wł.' : 'Wibracje: wył.';
@@ -415,6 +354,7 @@ function startLevel(i) {
   camZoom = 1;
   buildWorld(i);
   resetHero();
+  artSetup();
   // shadery wszystkich materiałów kompilujemy od razu, żeby gra nie przycinała przy pierwszym użyciu
   renderer.compile(scene, camera);
   state = 'play';
@@ -558,15 +498,16 @@ $('playBtn').addEventListener('click', () => {
   if (selIdx < save.unlocked) startLevel(selIdx);
 });
 $('pauseBtn').addEventListener('click', () => pause(true));
-$('tabUp').addEventListener('click', () => {
-  menuTab = 'up';
+$('forgeBtn').addEventListener('click', () => {
+  audioInit();
   sfx.click();
-  renderMenu();
+  openForge('up');
 });
-$('tabTal').addEventListener('click', () => {
-  menuTab = 'tal';
+$('resForge').addEventListener('click', () => {
   sfx.click();
-  renderMenu();
+  selIdx = state === 'win' ? Math.min(levelIdx + 1, LEVELS.length - 1) : levelIdx;
+  toMenu();
+  openForge('up');
 });
 $('pauseBtn').addEventListener('pointerdown', e => {
   e.preventDefault();

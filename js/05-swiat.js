@@ -179,6 +179,7 @@ let lightSrc = [],
 function clearWorld() {
   resetBossFx();
   cryptReset();
+  artReset();
   for (let i = world.children.length - 1; i >= 0; i--) {
     const o = world.children[i];
     world.remove(o);

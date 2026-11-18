@@ -82,7 +82,7 @@ function heroStrike() {
     fin = h.swingKind === 2,
     range = fin ? 3.0 : 2.55,
     arc = fin ? 2.7 : 2.3,
-    focus = h.focus > 0,
+    focus = h.focus > 0 || h.cloakT > 0,
     mul = comboMul();
   let hits = 0,
     critAny = false;
@@ -142,6 +142,10 @@ function heroStrike() {
     h.pop = 0.5;
     if (hits > 0) decal(h.x + s * 1.5, h.z + c * 1.5, 1.0, 2);
   }
+  if (hits > 0 && h.cloakT > 0) {
+    h.cloakT = 0;
+    artCloakEnd();
+  }
   if (hits > 0) {
     addCombo(hits);
     if (focus) h.focus = 0;
@@ -198,7 +202,7 @@ function updateHero(dt) {
       burst(h.x, 0.1, h.z, theme.dust, 5, 2.4, 0.12, 0.35, 3);
     }
   } else {
-    const sp = h.speed * (h.swingT > 0 ? 0.3 : 1) * (h.spinT > 0 ? 0.6 : 1);
+    const sp = h.speed * (h.swingT > 0 ? 0.3 : 1) * (h.spinT > 0 ? 0.6 : 1) * (h.cloakT > 0 ? 1.4 : 1);
     h.vx = damp(h.vx, moving ? wx * sp : 0, moving ? 16 : 22, dt);
     h.vz = damp(h.vz, moving ? wz * sp : 0, moving ? 16 : 22, dt);
     moveCircle(h, (h.vx + h.kx) * dt, (h.vz + h.kz) * dt);
@@ -232,17 +236,17 @@ function updateHero(dt) {
       h.bowT = 0.24;
       const s = Math.sin(h.face),
         c = Math.cos(h.face);
-      const crit = h.focus > 0 || h.hunter,
-        dmgA = h.atk * 1.15 * comboMul() * (crit ? 2 : 1),
-        ex = { pierce: TAL.pierce ? 2 : 0, crit };
-      for (const da of TAL.volley ? [-0.17, 0, 0.17] : [0]) {
+      const crit = h.focus > 0 || h.hunter || Math.random() < h.bowCrit,
+        dmgA = h.bowAtk * comboMul() * (crit ? 2 : 1),
+        ex = { pierce: h.pierce, crit };
+      for (const da of h.arrows === 3 ? [-0.17, 0, 0.17] : [0]) {
         const a2 = h.face + da;
         shoot(
           h.x + Math.sin(a2) * 0.6,
           h.z + Math.cos(a2) * 0.6,
           Math.sin(a2),
           Math.cos(a2),
-          26,
+          h.arrowSpd,
           0,
           dmgA * (da ? 0.7 : 1),
           'arrow',
@@ -281,6 +285,15 @@ function updateHero(dt) {
   if (h.swingT > 0) h.swingT -= dt;
   if (h.bowT > 0) h.bowT -= dt;
   if (h.spinT > 0) h.spinT -= dt;
+  if (h.spin2T > 0) {
+    h.spin2T -= dt;
+    if (h.spin2T <= 0) heroSpin(true);
+  }
+  if (h.cloakT > 0) {
+    h.cloakT -= dt;
+    h.inv = Math.max(h.inv, 0.05);
+    if (h.cloakT <= 0) artCloakEnd();
+  }
   for (const n of nodes) {
     const dx = h.x - n.x,
       dz = h.z - n.z,
@@ -298,13 +311,17 @@ function updateHero(dt) {
   }
   animHero(dt);
 }
-function heroSpin() {
+// pulse2: drugie uderzenie wiru z Amuletu dusz na poziomie 8 (60% siły, bez odnowienia)
+function heroSpin(pulse2) {
   const h = hero,
-    mul = comboMul();
-  h.cd.spec = h.max.spec * h.cdMul;
-  h.spinT = 0.42;
-  h.swingT = 0;
-  h.hitPending = false;
+    mul = comboMul() * (pulse2 ? 0.6 : 1);
+  if (!pulse2) {
+    h.cd.spec = h.max.spec * h.cdMul;
+    h.spinT = 0.42;
+    h.swingT = 0;
+    h.hitPending = false;
+    if (h.spin2) h.spin2T = 0.45;
+  }
   waveFx(h.x, h.z, 0.6, 4.0, COL_P, 0.4);
   waveFx(h.x, h.z, 0.4, 3.0, 0xffffff, 0.3);
   burst(h.x, 0.8, h.z, COL_P, 22, 8, 0.16, 0.5, 6);
@@ -312,7 +329,7 @@ function heroSpin() {
   sfx.spec();
   shake(0.4);
   let hits = 0;
-  const R = TAL.storm ? 4.8 : 3.8;
+  const R = h.specR;
   if (TAL.storm) waveFx(h.x, h.z, 4.8, 0.6, 0x9fe8ff, 0.5);
   for (const u of units) {
     if (u.team !== 1 || u.dead) continue;
@@ -320,7 +337,7 @@ function heroSpin() {
       dz = u.z - h.z,
       d = Math.hypot(dx, dz) || 1;
     if (d < R + u.r) {
-      if (hurt(u, h.atk * 2.6 * mul, h.x, h.z, TAL.storm ? 0 : 14, true)) hits++;
+      if (hurt(u, h.specDmg * mul, h.x, h.z, TAL.storm ? 0 : 14, true)) hits++;
       if (TAL.storm && !u.def.heavy && !u.dead) {
         // burza przyciąga wrogów do bohatera
         u.kx = (-dx / d) * Math.min(9, d * 3);
@@ -332,7 +349,7 @@ function heroSpin() {
   for (const n of nodes) {
     if (n.own === 1 && Math.hypot(n.x - h.x, n.z - h.z) < R + n.r) {
       const sh = n.shield;
-      hurtNode(n, h.atk * 2.6 * mul, 0);
+      hurtNode(n, h.specDmg * mul, 0);
       if (!sh) hits++;
     }
   }
@@ -498,7 +515,7 @@ function animHero(dt) {
   h.root.position.set(h.x, y, h.z);
   h.root.rotation.set(-h.pop * 0.18, h.face + extra, sn * 0.03 * mv);
   h.root.scale.set(px, 1 - h.pop * 0.12, px);
-  h.root.visible = !(h.inv > 0 && h.rollT <= 0 && Math.floor(time * 30) % 3 === 0);
+  h.root.visible = !(h.inv > 0 && h.rollT <= 0 && h.cloakT <= 0 && Math.floor(time * 30) % 3 === 0);
   h.blob.position.set(h.x, 0.032, h.z);
   h.ring.position.set(h.x, 0.04, h.z);
   h.ring.material.opacity = (h.focus > 0 ? 0.9 : 0.42) + Math.sin(time * 3) * 0.08;
