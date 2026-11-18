@@ -310,9 +310,21 @@ function updateAmbient(dt) {
       z = camT.z + rnd(-16, 16);
     if (k === 'forest') sparks.burst(x, rnd(0.4, 2.6), z, theme.mote, 1, 0.5, 0.07, 3, -0.25);
     else if (k === 'crypt') sparks.burst(x, rnd(0.1, 1.6), z, theme.mote, 1, 0.35, 0.07, 3.6, -0.35);
-    else if (k === 'dusk')
+    else if (k === 'dusk') {
       sparks.burst(x, rnd(0.1, 1.2), z, Math.random() < 0.7 ? theme.mote : 0xffd0a0, 1, 0.7, 0.06, 2.6, -0.9);
-    else if (k === 'desert') sparks.burst(x, rnd(0.2, 2), z, theme.mote, 1, 1.6, 0.05, 2.2, 0.3);
+      if (Math.random() < 0.6)
+        sparks.burst(
+          camT.x + rnd(-14, 14),
+          rnd(4, 7),
+          camT.z + rnd(-14, 14),
+          0x6a6470,
+          1,
+          0.25,
+          0.05,
+          3.2,
+          0.35
+        );
+    } else if (k === 'desert') sparks.burst(x, rnd(0.2, 2), z, theme.mote, 1, 1.6, 0.05, 2.2, 0.3);
     else if (!walkAt(x, z)) {
       if (Math.random() < 0.06) sparks.burst(x, theme.underY + 0.1, z, 0xffc050, 6, 3, 0.12, 0.6);
       else

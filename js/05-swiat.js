@@ -680,6 +680,29 @@ function buildWorld(idx) {
     }
   }
   if (TH.traps) cryptBuild(L, rng, pathM, linkD, db);
+  if (key === 'dusk' && L.bossNode !== undefined) {
+    // obsydianowy tron na arenie Księcia, z chorągwiami po bokach
+    const n = L.nodes[L.bossNode],
+      tx = n.x,
+      tz = n.z - n.r + 2.4;
+    for (let dz = -1; dz <= 1; dz++)
+      for (let dx = -2; dx <= 1; dx++) grid[((tz + dz) | 0) * G + ((tx + dx) | 0)] = 3;
+    db.add(tx, 0.3, tz, 3.4, 0.6, 2.2, 0x1c1622);
+    db.add(tx, 0.85, tz + 0.2, 2.2, 0.5, 1.4, 0x241c2c);
+    db.add(tx, 2.4, tz - 0.6, 2.4, 3.2, 0.5, 0x1c1622);
+    db.add(tx, 4.2, tz - 0.6, 1.2, 0.6, 0.5, 0x241c2c);
+    for (const s of [-1, 1]) {
+      db.add(tx + s * 1.2, 1.4, tz + 0.2, 0.3, 0.7, 1.4, 0x2c2434);
+      db.add(tx + s * 1.1, 4.0, tz - 0.6, 0.2, 1.0, 0.2, 0xd8d2c0);
+      db.add(tx + s * 2.4, 2.0, tz - 0.2, 0.12, 4.0, 0.12, 0x1a1418);
+      db.add(tx + s * 2.4, 3.0, tz + 0.05, 0.7, 1.6, 0.05, 0x7a1424);
+      eb.add(tx + s * 2.4, 3.2, tz + 0.09, 0.2, 0.2, 0.02, 0xff6070);
+    }
+    db.add(tx, 1.15, tz + 0.2, 1.8, 0.12, 1.1, 0x7a1424);
+    eb.add(tx, 2.6, tz - 0.34, 0.08, 2.4, 0.02, TH.fire.a);
+    eb.add(tx, 4.5, tz - 0.6, 0.3, 0.3, 0.3, 0xff3050);
+    addLight(tx, 3.2, tz + 0.6, 0xff4060, 8, 0.8, 3);
+  }
   for (const n of L.nodes) {
     const ci = n.x | 0,
       cj = n.z | 0;

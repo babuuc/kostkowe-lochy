@@ -9,6 +9,8 @@
 const darkCv = $('dark'),
   dctx = darkCv.getContext('2d');
 let darkOn = false,
+  boltA = 0,
+  boltT = 20,
   cloakVis = 0,
   darkMul = 1,
   darkFlare = 0,
@@ -42,12 +44,40 @@ function darkHole(x, z, r, soft) {
   dctx.fillStyle = g;
   dctx.fillRect(px - R, py - R, R * 2, R * 2);
 }
+const moon = new THREE.Mesh(
+  POOL_GEO,
+  new THREE.MeshBasicMaterial({
+    map: glowTex,
+    color: 0xff3048,
+    transparent: true,
+    opacity: 0.45,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  })
+);
+moon.rotation.x = -Math.PI / 2;
+moon.scale.set(26, 26, 1);
+moon.visible = false;
+fxG.add(moon);
 function darkReset() {
+  boltA = 0;
+  boltT = 20;
   darkMul = 1;
   darkFlare = 0;
   flareT = 8;
 }
 function updateDark(dt) {
+  // odbicie krwawego księżyca w otchłani (także w podglądzie w menu)
+  const moonOn = !!(theme && theme.dark);
+  moon.visible = moonOn;
+  if (moonOn) {
+    moon.position.set(camT.x + 9, theme.underY + 0.06, camT.z - 7);
+    moon.material.opacity =
+      0.42 +
+      Math.sin(time * 0.4) * 0.05 +
+      (boss && boss.def.prince && (boss.ph === 3 || boss.ph === 5) ? 0.25 : 0);
+  }
   const on = !!(theme && theme.dark && state !== 'menu');
   if (on !== darkOn) {
     darkOn = on;
@@ -63,6 +93,14 @@ function updateDark(dt) {
   const h = hero,
     pr = boss && !boss.dead && boss.def.prince ? boss : null;
   if (state === 'play') {
+    boltT -= dt;
+    if (boltT <= 0) {
+      boltT = rnd(18, 30);
+      boltA = 1;
+      flash(camT.x + rnd(-8, 8), 10, camT.z + rnd(-8, 8), 0xd8d0ff, 2.6, 0.4, 60);
+      sfx.thunder();
+    }
+    if (boltA > 0) boltA = Math.max(0, boltA - dt * 2.2);
     if (h.flare && !h.dead) {
       flareT -= dt;
       if (flareT <= 0) {
@@ -86,7 +124,7 @@ function updateDark(dt) {
   dctx.clearRect(0, 0, W, H);
   // Płaszcz cienia: póki działa, mrok się rozprasza (i wraca powoli po jego końcu)
   cloakVis = damp(cloakVis, h.cloakT > 0 && !h.dead ? 1 : 0, h.cloakT > 0 ? 6 : 1.2, dt);
-  const al = (red ? 0.8 : 0.95) * (1 - cloakVis * 0.94);
+  const al = (red ? 0.8 : 0.95) * (1 - cloakVis * 0.94) * (1 - boltA * 0.85);
   dctx.fillStyle = red ? 'rgba(30,2,8,' + al.toFixed(3) + ')' : 'rgba(3,2,8,' + al.toFixed(3) + ')';
   dctx.fillRect(0, 0, W, H);
   dctx.globalCompositeOperation = 'destination-out';
@@ -94,12 +132,24 @@ function updateDark(dt) {
   else darkHole(camT.x, camT.z, 5, 0.4);
   for (const n of nodes) if (n.own === 0) darkHole(n.x, n.z, 6.5, 0.35);
   for (const p of pillars) if (p.on) darkHole(p.x, p.z, PILLAR_R + 1.2, 0.5);
-  for (const l of pLines) {
-    const len = Math.hypot(l.x1 - l.x0, l.z1 - l.z0),
+  for (const a of aimLines) {
+    if (!a.m.visible) continue;
+    const len = a.m.scale.z,
+      ry = a.m.rotation.y,
+      hx = (Math.sin(ry) * len) / 2,
+      hz = (Math.cos(ry) * len) / 2,
       n = Math.max(1, Math.ceil(len / 1.6));
     for (let k = 0; k <= n; k++)
-      darkHole(lerp(l.x0, l.x1, k / n), lerp(l.z0, l.z1, k / n), l.w * 0.5 + 0.7, 0.4);
+      darkHole(
+        a.m.position.x - hx + (2 * hx * k) / n,
+        a.m.position.z - hz + (2 * hz * k) / n,
+        a.m.scale.x * 0.5 + 0.7,
+        0.4
+      );
   }
+  for (const t of traps)
+    if ((t.warn > 0 || t.up > 0) && Math.abs(t.x - h.x) + Math.abs(t.z - h.z) < 20)
+      darkHole(t.x, t.z, 1.4, 0.4);
   for (const s of lightSrc) if (!s.node && !s.unit && s.d < 32) darkHole(s.x, s.z, 2.6, 0.2);
   for (const t of totems) darkHole(t.x, t.z, t.r + 0.5, 0.5);
   // niebezpieczeństwo jest widoczne zawsze
@@ -125,8 +175,11 @@ function updateDark(dt) {
       if (d < sight * 0.85 || d > sight * 2.6) continue;
       const p = darkScreen(u.x, u.h * u.baseScale * 0.85, u.z);
       if (p[2] > 1) continue;
-      dctx.fillRect(p[0] - 1.2, p[1] - 0.5, 0.9, 0.9);
-      dctx.fillRect(p[0] + 0.3, p[1] - 0.5, 0.9, 0.9);
+      dctx.fillStyle = 'rgba(255,60,70,0.35)';
+      dctx.fillRect(p[0] - 2, p[1] - 1.2, 4, 2.2);
+      dctx.fillStyle = 'rgba(255,90,100,1)';
+      dctx.fillRect(p[0] - 1.5, p[1] - 0.6, 1.2, 1.1);
+      dctx.fillRect(p[0] + 0.3, p[1] - 0.6, 1.2, 1.1);
     }
   }
 }

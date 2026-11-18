@@ -1003,6 +1003,7 @@ function princeAct(u, a, dt) {
       for (const s of a.spots) {
         if (s.real) continue;
         const sh = makeUnit('shade', s.x, s.z, null);
+        sh.noLoot = true;
         sh.spawnT = sh.spawnDur = 0.5;
         sh.face = Math.atan2(hero.x - s.x, hero.z - s.z);
         sh.minionOf = u;
