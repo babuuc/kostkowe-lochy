@@ -12,7 +12,7 @@ function quality(raw) {
   qT += raw;
   if (qT > 4) {
     qT = 0;
-    if (ftEMA > 27 && qLevel < 3) {
+    if (ftEMA > 22 && qLevel < 3) {
       qLevel++;
       if (qLevel === 1) {
         pixelRatio = Math.min(pixelRatio, 1.25);

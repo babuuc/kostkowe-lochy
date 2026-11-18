@@ -419,7 +419,7 @@ function makeBlob(r) {
 function makeUnit(type, x, z, home) {
   const def = UNIT[type],
     ally = !!def.ally,
-    sc = ally ? (1 + 0.15 * levelIdx) * (1 + 0.25 * save.up.gol) : 1 + 0.24 * levelIdx;
+    sc = ally ? (1 + 0.15 * levelIdx) * (1 + 0.2 * save.up.gol) : 1 + 0.24 * levelIdx;
   const elite =
     !ally && levelIdx > 0 && !def.boss && !def.bomb && !def.heal && Math.random() < (level.elite || 0.1);
   const u = {
@@ -433,7 +433,7 @@ function makeUnit(type, x, z, home) {
     kz: 0,
     r: def.r * (elite ? 1.2 : 1),
     maxHp: Math.round(def.hp * sc * (elite ? 2.3 : 1)),
-    dmg: def.dmg * (ally ? 1 + 0.25 * save.up.gol : 1 + 0.2 * levelIdx) * (elite ? 1.3 : 1),
+    dmg: def.dmg * (ally ? 1 + 0.2 * save.up.gol : 1 + 0.2 * levelIdx) * (elite ? 1.3 : 1),
     spd: def.spd * rnd(0.9, 1.1),
     team: ally ? 0 : 1,
     face: rnd(TAU),
@@ -459,7 +459,7 @@ function makeUnit(type, x, z, home) {
     dead: false,
     spawnT: 0.45,
     spawnDur: 0.45,
-    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.62 : elite ? 1.28 : 1,
+    baseScale: type === 'boss' ? 1.75 : type === 'lich' ? 1.8 : elite ? 1.28 : 1,
     h: def.h * (elite ? 1.25 : 1),
     meshes: [],
     pcol: 0xffffff,
@@ -483,6 +483,13 @@ function makeUnit(type, x, z, home) {
   u.parts = buildModel(type, u.root);
   if (elite) glowSprite(u.root, COL_E, 2.6, 0, 0.5, 0, 0.45);
   u.frags = bake(u.root, type + '|' + theme.key);
+  if (def.lich) lichSkin(u.root);
+  // zwykli wrogowie rzucają cień tylko tułowiem i głową (resztę załatwia miękki cień pod stopami)
+  else if (u.parts.body && u.parts.legL)
+    u.root.traverse(o => {
+      if (o.isMesh && o.castShadow && o.parent !== u.parts.body && o.parent !== u.parts.head)
+        o.castShadow = false;
+    });
   u.root.traverse(o => {
     if (o.isMesh) u.meshes.push(o);
   });
@@ -715,11 +722,24 @@ const hero = {
 function resetHero() {
   const n = nodes[0],
     h = hero;
-  h.maxHp = 100 + 20 * save.up.hp;
-  h.hp = h.maxHp;
-  h.atk = 14 * (1 + 0.15 * save.up.atk);
-  h.speed = 6.2 * (1 + 0.04 * save.up.agi);
-  h.cdMul = 1 - 0.07 * save.up.agi;
+  const U = save.up;
+  TAL = {};
+  for (const id of save.tal) TAL[id] = true;
+  h.maxHp = 100 + 18 * U.hp;
+  h.atk = 14 * (1 + 0.12 * U.atk);
+  h.speed = 6.2 * (1 + 0.03 * U.agi);
+  h.cdMul = 1 - 0.05 * U.agi;
+  h.critC = 0.12 + (U.atk >= 4 ? 0.05 : 0);
+  h.critM = U.atk >= 8 ? 2.5 : 2;
+  h.potHeal = U.hp >= 4 ? 0.7 : 0.5;
+  h.regen = U.hp >= 8 ? 1 : 0;
+  h.max.roll = U.agi >= 4 ? 0.6 : 0.9;
+  h.rollSpd = U.agi >= 8 ? ROLL_SPD * 1.2 : ROLL_SPD;
+  h.rollInv = U.agi >= 8 ? 0.25 : 0.08;
+  h.max.bow = 0.55 * (TAL.quick ? 0.65 : 1);
+  h.max.potion = 18 * (TAL.alch ? 0.7 : 1);
+  h.secondUsed = false;
+  h.hunter = false;
   h.x = n.x;
   h.z = n.z + 2.8;
   h.vx = h.vz = h.kx = h.kz = 0;

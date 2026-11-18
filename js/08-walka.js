@@ -40,6 +40,16 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
     }
     if (hero.inv > 0) return false;
     hero.hp -= dmg;
+    if (hero.hp <= 0 && TAL.second && !hero.secondUsed) {
+      // druga szansa: raz na etap bohater zostaje przy życiu
+      hero.secondUsed = true;
+      hero.hp = 1;
+      hero.inv = 2;
+      dmgNum(hero.x, hero.h + 0.8, hero.z, 'Druga szansa!', 'crit');
+      flash(hero.x, 1.5, hero.z, 0xffe08a, 2, 0.6, 10);
+      waveFx(hero.x, hero.z, 0.4, 3, 0xffe08a, 0.5);
+      sfx.perfect();
+    }
     hero.inv = 0.5;
     hurtFlash = 1;
     shake(0.45);
@@ -254,14 +264,31 @@ function die(u, silent) {
   corpses.push(u);
   if (u.team === 1) {
     kills++;
+    if (TAL.reaper && !silent) hero.cd.spec = Math.max(0, hero.cd.spec - 0.6);
     if (u.home && !u.raid && !u.def.boss && u.home.own === 1) u.home.kids--;
     if (!u.noLoot) {
       const g = u.def.gems * (u.elite ? 3 : 1) + (hero.comboN >= 10 ? 1 : 0);
       for (let k = 0; k < g; k++) dropGem(u.x, u.z);
       if (Math.random() < (u.elite ? 0.6 : 0.1)) dropGem(u.x, u.z, 'heart');
     }
-  } else if (u.home && u.home.own === 0) u.home.allies = Math.max(0, u.home.allies - 1);
+  } else {
+    if (u.home && u.home.own === 0) u.home.allies = Math.max(0, u.home.allies - 1);
+    if (u.type === 'golem' && save.up.gol >= 8 && !silent) {
+      // golemy z ulepszeniem 8 wybuchają przy śmierci
+      waveFx(u.x, u.z, 0.4, 2.4, COL_P, 0.35);
+      burst(u.x, 0.6, u.z, COL_P, 16, 6, 0.14, 0.5);
+      sfx.boom();
+      for (const e of units)
+        if (e.team === 1 && !e.dead && Math.hypot(e.x - u.x, e.z - u.z) < 2.4 + e.r) hurt(e, 30, u.x, u.z, 8);
+    }
+  }
   if (!silent) sfx.die();
+  if (u.def.lich) {
+    // dusze uwalniają się z rozbitego Strażnika
+    burst(u.x, 2.5, u.z, LICH_C, 70, 9, 0.2, 2.2, -5);
+    burst(u.x, 1.2, u.z, 0xffffff, 30, 12, 0.14, 0.8);
+    flash(u.x, 3, u.z, 0xc8fff2, 4, 1.2, 22);
+  }
   if (u.def.boss) {
     boss = null;
     lightSrc = lightSrc.filter(s => s.unit !== u);
@@ -381,7 +408,7 @@ function refreshEnemyField() {
       const cs = nodeCells(n);
       for (let k = 0; k < cs.length; k++) src.push(cs[k]);
     }
-  if (boss && !boss.dead) src.push(cellOf(boss.x, boss.z));
+  if (boss && !boss.dead && !boss.def.lich) src.push(cellOf(boss.x, boss.z));
   bfs(fieldEnemy, src);
 }
 function refreshFields() {

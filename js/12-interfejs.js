@@ -78,6 +78,36 @@ function updateHud(dt) {
     bh.classList.toggle('phased', !!boss.def.lich);
     bh.classList.toggle('shielded', !!(boss.def.lich && lichImmune(boss)));
   }
+  // strzałka przy krawędzi ekranu, gdy boss jest poza kadrem
+  {
+    const ar = $('bossArrow');
+    let show = false;
+    if (boss && !boss.dead && !hero.dead) {
+      tmpV.set(boss.x, 2, boss.z).project(camera);
+      const W = window.innerWidth,
+        Hh = window.innerHeight,
+        sx = (tmpV.x * 0.5 + 0.5) * W,
+        sy = (-tmpV.y * 0.5 + 0.5) * Hh,
+        m = 44;
+      if (sx < m || sx > W - m || sy < m + 60 || sy > Hh - m || tmpV.z > 1) {
+        show = true;
+        const cx = W / 2,
+          cy = Hh / 2,
+          ang = Math.atan2(sy - cy, sx - cx),
+          px = clamp(sx, m, W - m),
+          py = clamp(sy, m + 60, Hh - m);
+        ar.style.transform =
+          'translate(' +
+          px.toFixed(0) +
+          'px,' +
+          py.toFixed(0) +
+          'px) rotate(' +
+          (ang + Math.PI / 2).toFixed(2) +
+          'rad)';
+      }
+    }
+    if (ar.hidden === show) ar.hidden = !show;
+  }
   if (banT > 0) {
     banT -= dt;
     if (banT <= 0) $('banner').classList.remove('show');
@@ -208,14 +238,77 @@ function hint(list) {
 while (save.stars.length < LEVELS.length) save.stars.push(0);
 for (let i = 0; i < LEVELS.length; i++) if (save.stars[i] > 0) save.unlocked = Math.max(save.unlocked, i + 2);
 save.unlocked = clamp(save.unlocked, 1, LEVELS.length);
+// talenty z zapisu: tylko znane i tylko na tyle, na ile starcza punktów
+save.tal = save.tal.filter((id, i) => TALENTS.some(t => t.id === id) && save.tal.indexOf(id) === i);
+if (talSpent() > talPoints()) save.tal = [];
 let selIdx = save.unlocked - 1;
-const UPG = [
-  { k: 'atk', name: 'Ostrze', desc: '+15% obrażeń' },
-  { k: 'hp', name: 'Serce', desc: '+20 zdrowia' },
-  { k: 'agi', name: 'Buty', desc: 'ruch i odnowienia' },
-  { k: 'gol', name: 'Golemy', desc: '+25% siły golemów' },
-];
-const upCost = l => 30 + 30 * l;
+let menuTab = 'up';
+function talPoints() {
+  return save.stars.reduce((a, b) => a + b, 0);
+}
+function talSpent() {
+  return save.tal.reduce((a, id) => {
+    const t = TALENTS.find(x => x.id === id);
+    return a + (t ? t.cost : 0);
+  }, 0);
+}
+function renderTalents() {
+  const el = $('tal'),
+    free = talPoints() - talSpent();
+  el.textContent = '';
+  $('talPts').textContent = free + '/' + talPoints();
+  BRANCHES.forEach((bn, bi) => {
+    const col = document.createElement('div');
+    col.className = 'tcol';
+    col.innerHTML = '<h3>' + bn + '</h3>';
+    for (let t = 0; t < 4; t++) {
+      const T = TALENTS.find(x => x.b === bi && x.t === t),
+        own = save.tal.includes(T.id),
+        prev = t === 0 || save.tal.includes(TALENTS.find(x => x.b === bi && x.t === t - 1).id),
+        can = !own && prev && free >= T.cost;
+      const b = document.createElement('button');
+      b.className = 'tal' + (own ? ' own' : can ? ' can' : ' lock');
+      b.disabled = !can && !own;
+      b.innerHTML =
+        '<b>' +
+        T.name +
+        '</b><small>' +
+        T.desc +
+        '</small><span class="tc">' +
+        (own ? 'aktywny' : T.cost + ' pkt') +
+        '</span>';
+      b.setAttribute(
+        'aria-label',
+        T.name + ': ' + T.desc + (own ? ', aktywny' : ', koszt ' + T.cost + ' pkt')
+      );
+      b.addEventListener('click', () => {
+        if (!can) return;
+        audioInit();
+        save.tal.push(T.id);
+        persist();
+        sfx.heal();
+        renderMenu();
+      });
+      col.appendChild(b);
+    }
+    el.appendChild(col);
+  });
+  const r = document.createElement('button');
+  r.className = 'btn talreset';
+  r.textContent = 'Zresetuj talenty';
+  r.disabled = !save.tal.length;
+  r.addEventListener('click', () => {
+    save.tal = [];
+    persist();
+    sfx.click();
+    renderMenu();
+  });
+  const note = document.createElement('p');
+  note.className = 'talnote';
+  note.textContent = 'Każda zdobyta gwiazdka to punkt talentu. Reset jest darmowy.';
+  el.appendChild(note);
+  el.appendChild(r);
+}
 const starStr = n => '<span>' + '★'.repeat(n) + '</span><span class="off">' + '★'.repeat(3 - n) + '</span>';
 const fmtTime = s => {
   const mm = Math.floor(s / 60),
@@ -269,15 +362,17 @@ function renderMenu() {
   $('menuGems').textContent = save.gems;
   const up = $('upg');
   up.textContent = '';
-  for (const u of UPG) {
+  for (const u of UPGRADES) {
     const lv = save.up[u.k],
-      maxed = lv >= 5,
+      maxed = lv >= UP_MAX,
       cost = upCost(lv);
     const b = document.createElement('button');
     b.className = 'up';
     b.disabled = maxed || save.gems < cost;
     let pips = '';
-    for (let i = 0; i < 5; i++) pips += '<i' + (i < lv ? ' class="on"' : '') + '></i>';
+    for (let i = 0; i < UP_MAX; i++)
+      pips += '<i class="' + (i < lv ? 'on' : '') + (i === 3 || i === 7 ? ' ms' : '') + '"></i>';
+    const nm = lv < 4 ? 'poz. 4: ' + u.m[0] : lv < 8 ? 'poz. 8: ' + u.m[1] : 'wszystkie premie';
     b.innerHTML =
       '<b>' +
       u.name +
@@ -285,12 +380,14 @@ function renderMenu() {
       u.desc +
       '</small><span class="lv">' +
       pips +
-      '</span><span class="cost">' +
+      '</span><em>' +
+      nm +
+      '</em><span class="cost">' +
       (maxed ? 'maks.' : '<i class="gem"></i>' + cost) +
       '</span>';
     b.setAttribute(
       'aria-label',
-      u.name + ', poziom ' + lv + ' z 5' + (maxed ? '' : ', koszt ' + cost + ' odłamków')
+      u.name + ', poziom ' + lv + ' z ' + UP_MAX + (maxed ? '' : ', koszt ' + cost + ' odłamków') + ', ' + nm
     );
     b.addEventListener('click', () => {
       if (save.gems < cost || maxed) return;
@@ -303,6 +400,12 @@ function renderMenu() {
     });
     up.appendChild(b);
   }
+  renderTalents();
+  $('tabUp').classList.toggle('on', menuTab === 'up');
+  $('tabTal').classList.toggle('on', menuTab === 'tal');
+  $('upg').hidden = menuTab !== 'up';
+  $('tal').hidden = menuTab !== 'tal';
+  $('gemBox').hidden = menuTab !== 'up';
   $('muteBtn').textContent = save.mute ? 'Dźwięk: wył.' : 'Dźwięk: wł.';
   $('vibBtn').hidden = !(isTouch && canVib);
   $('vibBtn').textContent = save.vib ? 'Wibracje: wł.' : 'Wibracje: wył.';
@@ -312,6 +415,8 @@ function startLevel(i) {
   camZoom = 1;
   buildWorld(i);
   resetHero();
+  // shadery wszystkich materiałów kompilujemy od razu, żeby gra nie przycinała przy pierwszym użyciu
+  renderer.compile(scene, camera);
   state = 'play';
   levelTime = 0;
   kills = 0;
@@ -453,6 +558,16 @@ $('playBtn').addEventListener('click', () => {
   if (selIdx < save.unlocked) startLevel(selIdx);
 });
 $('pauseBtn').addEventListener('click', () => pause(true));
+$('tabUp').addEventListener('click', () => {
+  menuTab = 'up';
+  sfx.click();
+  renderMenu();
+});
+$('tabTal').addEventListener('click', () => {
+  menuTab = 'tal';
+  sfx.click();
+  renderMenu();
+});
 $('pauseBtn').addEventListener('pointerdown', e => {
   e.preventDefault();
   e.stopPropagation();

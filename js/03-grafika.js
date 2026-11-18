@@ -14,7 +14,7 @@ try {
   throw e;
 }
 const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-let pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+let pixelRatio = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
 renderer.setPixelRatio(pixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;

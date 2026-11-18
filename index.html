@@ -47,6 +47,7 @@
       <div id="hint"></div>
       <div id="combo"><b id="comboN"></b><span id="comboB"></span></div>
       <div id="dmg"></div>
+      <div id="bossArrow" hidden></div>
       <div id="stick"><div id="knob"></div></div>
       <div id="actions">
         <button class="act" id="bAtk" aria-label="Atak mieczem">
@@ -98,9 +99,13 @@
         </div>
         <div class="card">
           <div class="shophead">
-            <span>Ulepszenia</span><span><i class="gem"></i><span id="menuGems">0</span></span>
+            <span class="tabs"
+              ><button class="tab on" id="tabUp">Ulepszenia</button
+              ><button class="tab" id="tabTal">Talenty <small id="talPts"></small></button></span
+            ><span id="gemBox"><i class="gem"></i><span id="menuGems">0</span></span>
           </div>
           <div id="upg"></div>
+          <div id="tal" hidden></div>
         </div>
         <div class="foot">
           <span id="ctrlNote"></span

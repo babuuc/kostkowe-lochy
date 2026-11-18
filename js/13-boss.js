@@ -13,13 +13,96 @@ const lichPoolMat = new THREE.MeshBasicMaterial({
   fog: false,
 });
 
+// Strażnik ma własny materiał: pikselowa faktura jak u innych postaci plus turkusowa poświata krawędzi,
+// dzięki której odcina się od ciemnych krypt. Siła poświaty pulsuje przy trafieniach i zmianie fazy.
+const LICH_RIM = { value: new THREE.Vector4(0.27, 0.94, 0.78, 0.8) };
+const LICH_MAT = (function () {
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.tNoise = { value: noiseTex };
+    sh.uniforms.uRim = LICH_RIM;
+    sh.vertexShader = sh.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nvarying vec3 vTp; varying vec3 vTn; varying vec3 vRn; varying vec3 vRv;'
+      )
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTp = position * 2.0; vTn = normal;')
+      .replace(
+        '#include <project_vertex>',
+        '#include <project_vertex>\nvRn = normalize(normalMatrix * objectNormal); vRv = -mvPosition.xyz;'
+      );
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform sampler2D tNoise; uniform vec4 uRim; varying vec3 vTp; varying vec3 vTn; varying vec3 vRn; varying vec3 vRv;'
+      )
+      .replace(
+        '#include <color_fragment>',
+        '#include <color_fragment>\nvec3 tAn = abs(vTn); vec2 tUv = tAn.y > 0.5 ? vTp.xz : (tAn.x > 0.5 ? vTp.zy : vTp.xy);\ndiffuseColor.rgb *= 0.915 + texture2D(tNoise, tUv * 0.25).r * 0.17;'
+      )
+      .replace(
+        '#include <dithering_fragment>',
+        '#include <dithering_fragment>\nfloat rimF = 1.0 - max(dot(normalize(vRn), normalize(vRv)), 0.0);\ngl_FragColor.rgb += uRim.rgb * pow(rimF, 1.5) * uRim.a;'
+      );
+  };
+  m.customProgramCacheKey = () => 'lich-rim';
+  return m;
+})();
+const RUNE_TEX = dataTex(128, 128, (u, v) => {
+  const x = u * 2 - 1,
+    y = v * 2 - 1,
+    r = Math.hypot(x, y),
+    a = Math.atan2(y, x) + Math.PI;
+  let k = 0;
+  if (r > 0.9 && r < 0.96) k = 1;
+  else if (r > 0.62 && r < 0.66) k = 0.95;
+  else if (r > 0.3 && r < 0.33) k = 0.8;
+  else if (r > 0.71 && r < 0.85 && a % (TAU / 16) < 0.09) k = 0.9;
+  else if (r > 0.33 && r < 0.62 && Math.abs(((a + 0.02) % (TAU / 6)) - 0.02) < 0.035) k = 0.75;
+  else if (r < 0.96) k = 0.06;
+  return k;
+});
+const runeMat = new THREE.MeshBasicMaterial({
+  map: RUNE_TEX,
+  color: LICH_C,
+  transparent: true,
+  opacity: 0.85,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false,
+});
+const pillarMat = new THREE.MeshBasicMaterial({
+  map: beamTex,
+  color: LICH_C,
+  transparent: true,
+  opacity: 0,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+  fog: false,
+});
+// niewidoczny wzorzec: dzięki niemu shader Strażnika kompiluje się przy starcie etapu, a nie w chwili jego pojawienia się
+{
+  const w = new THREE.Mesh(BOX, LICH_MAT);
+  w.visible = false;
+  fxG.add(w);
+}
+function lichSkin(root) {
+  root.traverse(o => {
+    if (o.isMesh && o.material === CHAR_MAT) {
+      o.material = LICH_MAT;
+      o.userData.m = LICH_MAT;
+    }
+  });
+}
+
 /* ---------- model ---------- */
 // Wszystkie klocki są ustawione bez obrotu, bo przy scalaniu modelu (bake) liczy się tylko położenie i rozmiar.
 function buildLich(root) {
   const robe = 0x3a5866,
     rd = 0x2a404a,
     bone = 0xd8e0d8,
-    gold = 0x8a7a4a,
+    gold = 0xe0b850,
     dark = 0x0b1014;
   const b = new THREE.Group();
   b.position.y = 0.3;
@@ -58,9 +141,22 @@ function buildLich(root) {
     box(b, 0.1, 0.22, 0.1, bone, s * 0.7, 2.02, -0.12, 0, 1);
   }
   box(b, 0.8, 0.36, 0.3, rd, 0, 1.98, -0.25);
+  for (const s of [-1, 1]) box(b, 0.12, 0.12, 0.04, LICH_C, s * 0.56, 1.88, 0.26, LICH_C, 1);
+  // postrzępiona peleryna za plecami
+  const cape = new THREE.Group();
+  cape.position.set(0, 2.0, -0.34);
+  b.add(cape);
+  P.cape = cape;
+  box(cape, 0.95, 1.1, 0.06, rd, 0, -0.55, 0);
+  box(cape, 0.8, 0.45, 0.06, shade(rd, -0.04), 0, -1.3, -0.01);
+  box(cape, 0.2, 0.3, 0.06, shade(rd, -0.06), -0.32, -1.66, -0.01, 0, 1);
+  box(cape, 0.18, 0.26, 0.06, shade(rd, -0.06), 0.08, -1.67, -0.01, 0, 1);
+  box(cape, 0.2, 0.34, 0.06, shade(rd, -0.06), 0.33, -1.68, -0.01, 0, 1);
+  box(cape, 0.84, 0.05, 0.08, LICH_C, 0, -1.5, 0.0, LICH_C, 1);
   // czaszka w koronie
   const H = new THREE.Group();
   H.position.y = 1.92;
+  H.scale.setScalar(1.2);
   b.add(H);
   P.head = H;
   box(H, 0.5, 0.46, 0.48, bone, 0, 0.26, 0.02);
@@ -70,10 +166,11 @@ function buildLich(root) {
   box(H, 0.13, 0.13, 0.03, dark, 0.12, 0.3, 0.26, 0, 1);
   eye(P, H, 0.07, 0.07, LICH_C, LICH_C, -0.12, 0.3, 0.28);
   eye(P, H, 0.07, 0.07, LICH_C, LICH_C, 0.12, 0.3, 0.28);
+  for (const s of [-1, 1]) glowSprite(H, LICH_C, 0.55, s * 0.12, 0.3, 0.32, 0.9);
   box(H, 0.58, 0.1, 0.56, gold, 0, 0.52, 0.02, 0, 1);
   for (const [x, z, hh] of [
     [-0.24, 0.24, 0.26],
-    [0, 0.27, 0.36],
+    [0, 0.27, 0.5],
     [0.24, 0.24, 0.26],
     [-0.27, -0.2, 0.2],
     [0.27, -0.2, 0.2],
@@ -95,38 +192,58 @@ function buildLich(root) {
   const S = new THREE.Group();
   S.position.set(0, -0.8, 0.12);
   P.armR.add(S);
-  box(S, 0.08, 2.4, 0.08, 0x2a221c, 0, 0.3, 0);
-  box(S, 0.22, 0.08, 0.22, gold, 0, 1.25, 0, 0, 1);
-  box(S, 0.06, 0.3, 0.06, gold, -0.11, 1.4, 0, 0, 1);
-  box(S, 0.06, 0.3, 0.06, gold, 0.11, 1.4, 0, 0, 1);
-  P.orb = oct(S, 0.17, 0.22, 0.17, LICH_C, 0, 1.62, 0, LICH_C);
-  P.orbGlow = glowSprite(S, LICH_C, 1.8, 0, 1.62, 0, 0.7);
+  box(S, 0.08, 2.0, 0.08, 0x2a221c, 0, 0.2, 0);
+  box(S, 0.22, 0.08, 0.22, gold, 0, 1.05, 0, 0, 1);
+  box(S, 0.06, 0.3, 0.06, gold, -0.11, 1.2, 0, 0, 1);
+  box(S, 0.06, 0.3, 0.06, gold, 0.11, 1.2, 0, 0, 1);
+  P.orb = oct(S, 0.17, 0.22, 0.17, LICH_C, 0, 1.42, 0, LICH_C);
+  P.orbGlow = glowSprite(S, LICH_C, 1.8, 0, 1.42, 0, 0.7);
+  P.staff = S;
   glowSprite(b, LICH_C, 4.4, 0, 1.4, 0, 0.28);
+  P.orbit = [];
+  for (let k = 0; k < 3; k++) {
+    const g = new THREE.Group();
+    root.add(g);
+    oct(g, 0.12, 0.17, 0.12, 0xc8fff2, 0, 0, 0, LICH_C);
+    glowSprite(g, LICH_C, 1.1, 0, 0, 0, 0.6);
+    P.orbit.push(g);
+  }
   // poświata pod stopami, żeby boss odcinał się od ciemnej posadzki
   const pool = new THREE.Mesh(POOL_GEO, lichPoolMat);
   pool.rotation.x = -Math.PI / 2;
   pool.position.y = 0.04;
   pool.scale.set(4.2, 4.2, 1);
   root.add(pool);
+  P.runes = new THREE.Mesh(POOL_GEO, runeMat);
+  P.runes.rotation.x = -Math.PI / 2;
+  P.runes.position.y = 0.06;
+  P.runes.scale.set(3.6, 3.6, 1);
+  root.add(P.runes);
+  // słup światła przy pojawieniu się
+  P.pillar = new THREE.Mesh(BEAM_GEO, pillarMat);
+  P.pillar.position.y = 6;
+  P.pillar.scale.set(4, 1, 4);
+  root.add(P.pillar);
   return P;
 }
 
 /* ---------- efekty: ręce z grobów i bańka tarczy ---------- */
 const lichHands = [];
 {
-  const bm = mat(0xcfe8e0, 0x0a3028);
-  for (let i = 0; i < 8; i++) {
-    const g = new THREE.Group();
-    const add = (w, h, d, x, y, z) => {
-      const m = new THREE.Mesh(BOX, bm);
+  const parts = [],
+    add = (w, h, d, x, y, z, c) => {
+      const m = new THREE.Mesh(BOX, mat(c));
       m.scale.set(w, h, d);
       m.position.set(x, y, z);
-      g.add(m);
+      parts.push(m);
     };
-    add(0.3, 1.0, 0.3, 0, 0.5, 0);
-    add(0.46, 0.34, 0.22, 0, 1.15, 0);
-    for (let k = 0; k < 4; k++) add(0.08, 0.36, 0.08, -0.16 + k * 0.105, 1.48, 0);
-    add(0.08, 0.26, 0.08, 0.28, 1.2, 0.05);
+  add(0.3, 1.0, 0.3, 0, 0.5, 0, 0x3fb8a0);
+  add(0.46, 0.34, 0.22, 0, 1.15, 0, 0x8affe0);
+  for (let k = 0; k < 4; k++) add(0.08, 0.36, 0.08, -0.16 + k * 0.105, 1.48, 0, 0xc8fff2);
+  add(0.08, 0.26, 0.08, 0.28, 1.2, 0.05, 0xc8fff2);
+  const geo = mergeBoxes(parts);
+  for (let i = 0; i < 8; i++) {
+    const g = new THREE.Mesh(geo, CHAR_GLOW);
     g.visible = false;
     fxG.add(g);
     lichHands.push({ g, t: 0 });
@@ -190,7 +307,7 @@ function lichImmune(u) {
   return u.invT > 0 || (u.minions > 0 && u.shieldT > 0);
 }
 function lichBlocked(u) {
-  if (time - (u.pingT || 0) < 0.25) return;
+  if (time - (u.pingT || 0) < 0.6) return;
   u.pingT = time;
   dmgNum(u.x, u.h + 0.5, u.z, 'tarcza', 'ally');
   burst(u.x, 2, u.z, 0xbffff0, 4, 5, 0.1, 0.3);
@@ -209,8 +326,14 @@ function lichSetup(u) {
 }
 function lichStartPhase(u, ph) {
   u.act = null;
-  u.invT = 1.6;
+  u.invT = 1.0;
   u.cd = 1.0;
+  LICH_RIM.value.w = 2.5;
+  // przerwany atak nie zostawia na ziemi ostrzeżeń bez skutku
+  for (const t of teles) {
+    t.t = 0;
+    t.a.visible = t.b.visible = false;
+  }
   if (ph === 2) u.sumCd = 0;
   if (ph === 3) u.blinkCd = 1.5;
   waveFx(u.x, u.z, 0.6, 7, LICH_C, 0.7);
@@ -264,6 +387,24 @@ function lichAct(u, a, dt) {
   if (a.kind === 'bolts') {
     const wind = ph === 3 ? 0.55 : 0.75;
     if (a.shots === 0 && t === dt) sfx.wail();
+    if (a.shots === 0 && t < wind) {
+      const n = ph === 1 ? 5 : 7,
+        spread = ph === 1 ? 0.8 : 1.05,
+        base = Math.atan2(hero.x - u.x, hero.z - u.z),
+        k = t / wind;
+      for (let q = 0; q < n; q++) {
+        const ang = base - spread / 2 + (spread * q) / (n - 1);
+        aimLine(
+          u.x + Math.sin(ang) * 1.4,
+          u.z + Math.cos(ang) * 1.4,
+          u.x + Math.sin(ang) * 7,
+          u.z + Math.cos(ang) * 7,
+          k,
+          0.05 + k * 0.08,
+          0.9
+        );
+      }
+    }
     if (a.shots === 0 && t >= wind) {
       lichBolts(u, 0);
       a.shots = 1;
@@ -363,13 +504,13 @@ function lichAct(u, a, dt) {
       });
       // tarcza trwa, dopóki żyje choć jeden sługa (najwyżej 8 s)
       u.minions = a.spots.length;
-      u.shieldT = a.spots.length ? 8 : 0;
+      u.shieldT = a.spots.length ? 6 : 0;
       u.sumCd = 20;
     }
     if (t >= 1.4) end(1.0);
   } else if (a.kind === 'blink') {
     if (t === dt) {
-      u.invT = Math.max(u.invT, 0.75);
+      u.invT = Math.max(u.invT, 0.45);
       burst(u.x, 1.6, u.z, LICH_C, 22, 6, 0.16, 0.6, -1);
       sfx.wail();
     }
@@ -519,6 +660,30 @@ function animLich(u, dt) {
   P.tail.rotation.x = Math.sin(time * 2.4 + u.seed) * 0.12;
   P.head.rotation.y = a ? 0 : Math.sin(time * 0.7 + u.seed) * 0.3;
   P.orb.rotation.y += dt * 3;
+  // kostur zostaje prawie pionowo, gdy Strażnik unosi rękę
+  P.staff.rotation.x = -P.armR.rotation.x * 0.85;
+  P.cape.rotation.x = damp(
+    P.cape.rotation.x,
+    0.12 + Math.sin(time * 2.2 + u.seed) * 0.08 + Math.hypot(u.vx, u.vz) * 0.08,
+    6,
+    dt
+  );
+  P.runes.rotation.z += dt * (u.ph === 3 ? 1.4 : 0.45);
+  {
+    const rs = 3.6 + Math.sin(time * 2) * 0.12 + (lichImmune(u) ? 0.5 : 0);
+    P.runes.scale.set(rs, rs, 1);
+  }
+  runeMat.opacity = u.ph === 3 ? 1 : 0.75;
+  pillarMat.opacity = u.spawnT > 0 ? Math.min(0.9, u.spawnT) : damp(pillarMat.opacity, 0, 3, dt);
+  P.pillar.visible = pillarMat.opacity > 0.01;
+  if (Math.random() < 0.35)
+    burst(u.x + rnd(-0.6, 0.6), 0.4, u.z + rnd(-0.6, 0.6), LICH_C, 1, 0.5, 0.08, 1.1, -2.5);
+  P.orbit.forEach((g, k) => {
+    const ang = time * (a && a.kind === 'nova' ? 4 : 1.4) + (k * TAU) / 3;
+    g.position.set(Math.sin(ang) * 1.25, 1.55 + Math.sin(time * 2 + k) * 0.18, Math.cos(ang) * 1.25);
+    g.rotation.y = time * 3;
+  });
+  LICH_RIM.value.w = damp(LICH_RIM.value.w, (lichImmune(u) ? 1.3 : 0.8) + u.pop * 1.2, 4, dt);
   {
     const q = 1.4 + glow * 1.1 + Math.sin(time * 6) * 0.15;
     P.orbGlow.scale.set(q, q, 1);

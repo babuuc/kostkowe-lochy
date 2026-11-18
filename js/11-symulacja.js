@@ -79,7 +79,7 @@ function updateNodes(dt) {
       }
     } else if (n.timer <= 0) {
       n.timer = 7;
-      if (enemyLeft && n.allies < 2 && !ending) spawnFromNode(n);
+      if (enemyLeft && n.allies < (save.up.gol >= 4 ? 3 : 2) && !ending) spawnFromNode(n);
     }
   }
 }

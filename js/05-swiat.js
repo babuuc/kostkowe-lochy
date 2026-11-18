@@ -193,10 +193,7 @@ function clearWorld() {
     p.m.visible = false;
     gemPool.push(p.m);
   }
-  for (const p of projs) {
-    p.m.visible = false;
-    projPool.push(p.m);
-  }
+  projClear();
   nodes = [];
   units = [];
   pickups = [];

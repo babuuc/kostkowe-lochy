@@ -51,6 +51,7 @@ let save = {
   gems: 0,
   up: { atk: 0, hp: 0, agi: 0, gol: 0 },
   stars: [0, 0, 0],
+  tal: [],
   mute: false,
   vib: true,
 };
@@ -61,7 +62,8 @@ try {
     save.gems = Math.max(0, s.gems | 0);
     save.mute = !!s.mute;
     if (s.vib === false) save.vib = false;
-    if (s.up) for (const k of ['atk', 'hp', 'agi', 'gol']) save.up[k] = clamp(s.up[k] | 0, 0, 5);
+    if (Array.isArray(s.tal)) save.tal = s.tal.filter(x => typeof x === 'string').slice(0, 24);
+    if (s.up) for (const k of ['atk', 'hp', 'agi', 'gol']) save.up[k] = clamp(s.up[k] | 0, 0, 8);
     if (Array.isArray(s.stars))
       for (let i = 0; i < Math.min(s.stars.length, 20); i++) save.stars[i] = clamp(s.stars[i] | 0, 0, 3);
   }

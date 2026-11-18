@@ -378,7 +378,7 @@ for (let i = 0; i < 3; i++) {
 }
 // mgła nad otchłanią (etap krypt): przesuwa się nisko nad wodą, wyspy ją zasłaniają
 const mists = [];
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 3; i++) {
   const m = new THREE.Mesh(
     POOL_GEO,
     new THREE.MeshBasicMaterial({
@@ -392,7 +392,7 @@ for (let i = 0; i < 5; i++) {
     })
   );
   m.rotation.x = -Math.PI / 2;
-  m.scale.set(26 + i * 5, 16 + i * 3, 1);
+  m.scale.set(30 + i * 8, 18 + i * 5, 1);
   m.visible = false;
   fxG.add(m);
   mists.push({ m, x: G / 2 + (i - 2) * 14, z: G / 2 + (((i * 37) % 5) - 2) * 10, s: 0.6 + i * 0.15 });
@@ -544,37 +544,86 @@ function healHero(v) {
 }
 
 /* pociski */
-const projPool = [],
-  arrowMat = mat(0xefe4c4),
-  arrowMatE = mat(0xd8d4c0, 0x40181c),
-  orbMat = mat(COL_E, COL_E),
-  soulMat = mat(0xa0fff0, 0x2fd8b0);
-function shoot(x, z, dx, dz, speed, team, dmg, kind) {
-  let m = projPool.pop();
-  if (!m) {
-    m = new THREE.Mesh(BOX, arrowMat);
-    fxG.add(m);
-  }
-  if (kind === 'orb' || kind === 'soul') {
-    m.material = kind === 'soul' ? soulMat : orbMat;
-    m.scale.setScalar(kind === 'soul' ? 0.42 : 0.36);
-  } else {
-    m.material = team === 0 ? arrowMat : arrowMatE;
-    m.scale.set(0.08, 0.08, 0.8);
-  }
-  m.visible = true;
-  m.rotation.set(0, Math.atan2(dx, dz), 0);
+// Pociski są rysowane jako zestawy instancji (strzały, kule i ich poświata),
+// więc nawet sto pocisków naraz kosztuje tylko trzy wywołania rysowania.
+const PROJ_MAX = 220;
+function projSet(geo, mt) {
+  const m = new THREE.InstancedMesh(geo, mt, PROJ_MAX);
+  m.setColorAt(0, tmpC.setHex(0xffffff));
+  m.count = 0;
+  m.frustumCulled = false;
+  fxG.add(m);
+  return m;
+}
+const projArrow = projSet(BOX, new THREE.MeshLambertMaterial({ color: 0xffffff })),
+  projOrb = projSet(OCT, new THREE.MeshBasicMaterial({ color: 0xffffff })),
+  projHalo = projSet(
+    OCT,
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+function shoot(x, z, dx, dz, speed, team, dmg, kind, extra) {
+  if (projs.length >= PROJ_MAX) return;
+  kind = kind || 'arrow';
   projs.push({
     x,
     z,
     vx: dx * speed,
     vz: dz * speed,
-    life: kind === 'orb' || kind === 'soul' ? 3.4 : 1.4,
+    ry: Math.atan2(dx, dz),
+    life: kind === 'arrow' ? 1.4 : 3.4,
     team,
     dmg,
-    kind: kind || 'arrow',
-    m,
+    kind,
+    spin: Math.random() * 6,
+    pierce: (extra && extra.pierce) || 0,
+    crit: !!(extra && extra.crit),
+    hit: null,
   });
+}
+function projClear() {
+  projs = [];
+  projArrow.count = projOrb.count = projHalo.count = 0;
+}
+function projDraw() {
+  let na = 0,
+    no = 0;
+  for (const p of projs) {
+    dummy.position.set(p.x, 1.0, p.z);
+    if (p.kind === 'arrow') {
+      dummy.rotation.set(0, p.ry, 0);
+      dummy.scale.set(0.08, 0.08, 0.8);
+      dummy.updateMatrix();
+      projArrow.setMatrixAt(na, dummy.matrix);
+      projArrow.setColorAt(na, tmpC.setHex(p.team === 0 ? (p.crit ? 0xffe08a : 0xefe4c4) : 0xe8b0a8));
+      na++;
+    } else {
+      const s = p.kind === 'soul' ? 0.3 : 0.24,
+        c = p.kind === 'soul' ? 0xc8fff2 : 0xe0a0ff;
+      dummy.rotation.set(p.spin, p.spin * 0.7, 0);
+      dummy.scale.set(s, s * 1.3, s);
+      dummy.updateMatrix();
+      projOrb.setMatrixAt(no, dummy.matrix);
+      projOrb.setColorAt(no, tmpC.setHex(c));
+      dummy.scale.set(s * 2.1, s * 2.1, s * 2.1);
+      dummy.updateMatrix();
+      projHalo.setMatrixAt(no, dummy.matrix);
+      projHalo.setColorAt(no, tmpC.setHex(p.kind === 'soul' ? LICH_C : COL_E));
+      no++;
+    }
+  }
+  projArrow.count = na;
+  projOrb.count = projHalo.count = no;
+  for (const m of [projArrow, projOrb, projHalo]) {
+    m.instanceMatrix.needsUpdate = true;
+    m.instanceColor.needsUpdate = true;
+  }
 }
 function updateProjs(dt) {
   for (let i = projs.length - 1; i >= 0; i--) {
@@ -582,6 +631,7 @@ function updateProjs(dt) {
     p.x += p.vx * dt;
     p.z += p.vz * dt;
     p.life -= dt;
+    p.spin += dt * 7;
     let gone = p.life <= 0;
     if (!gone && p.x > 0 && p.z > 0 && p.x < G && p.z < G && grid[cellOf(p.x, p.z)] === 3) {
       gone = true;
@@ -592,12 +642,18 @@ function updateProjs(dt) {
         if (smashUrns(p.x, p.z, 0.15)) gone = true;
         if (!gone)
           for (const u of units) {
-            if (u.team !== 1 || u.dead) continue;
+            if (u.team !== 1 || u.dead || (p.hit && p.hit.has(u))) continue;
             if (Math.hypot(u.x - p.x, u.z - p.z) < u.r + 0.3) {
-              if (hurt(u, p.dmg, p.x - p.vx, p.z - p.vz, 5, false)) addCombo(1);
+              if (hurt(u, p.dmg, p.x - p.vx, p.z - p.vz, 5, p.crit)) addCombo(1);
               sfx.hit();
-              gone = true;
-              break;
+              if (p.pierce > 0) {
+                p.pierce--;
+                (p.hit || (p.hit = new Set())).add(u);
+                p.dmg *= 0.8;
+              } else {
+                gone = true;
+                break;
+              }
             }
           }
         if (!gone)
@@ -625,19 +681,11 @@ function updateProjs(dt) {
           }
       }
     }
-    if (gone) {
-      p.m.visible = false;
-      projPool.push(p.m);
-      projs.splice(i, 1);
-    } else {
-      p.m.position.set(p.x, 1.0, p.z);
-      if (p.kind === 'orb' || p.kind === 'soul') {
-        p.m.rotation.x += dt * 8;
-        p.m.rotation.y += dt * 6;
-        if (Math.random() < 0.5)
-          burst(p.x, 1, p.z, p.kind === 'soul' ? 0x7fffd8 : COL_E, 1, 0.6, 0.1, 0.3, 0);
-      } else if (Math.random() < 0.7)
-        burst(p.x, 1, p.z, p.team === 0 ? 0xfff2c0 : 0xff9080, 1, 0.3, 0.06, 0.22, 0);
-    }
+    if (gone) projs.splice(i, 1);
+    else if (p.kind === 'arrow') {
+      if (Math.random() < 0.6) burst(p.x, 1, p.z, p.team === 0 ? 0xfff2c0 : 0xff9080, 1, 0.3, 0.06, 0.22, 0);
+    } else if (Math.random() < (projs.length > 40 ? 0.15 : 0.4))
+      burst(p.x, 1, p.z, p.kind === 'soul' ? 0x7fffd8 : COL_E, 1, 0.6, 0.1, 0.3, 0);
   }
+  projDraw();
 }

@@ -470,3 +470,59 @@ const UNIT = {
     h: 1.65,
   },
 };
+
+// Ulepszenia za odłamki: 8 poziomów. Poziomy 4 i 8 dają dodatkową premię (pole m).
+const UPGRADES = [
+  {
+    k: 'atk',
+    name: 'Ostrze',
+    desc: '+12% obrażeń',
+    m: ['+5% szansy na krytyk', 'krytyk zadaje 2,5× obrażeń'],
+  },
+  { k: 'hp', name: 'Serce', desc: '+18 zdrowia', m: ['mikstura leczy 70%', 'regeneracja 1 pkt/s'] },
+  {
+    k: 'agi',
+    name: 'Buty',
+    desc: '+3% ruchu, −5% odnowień',
+    m: ['unik co 0,6 s', 'dalszy unik i dłuższa nietykalność'],
+  },
+  {
+    k: 'gol',
+    name: 'Golemy',
+    desc: '+20% siły golemów',
+    m: ['3 golemy na kapliczkę', 'golemy wybuchają, gdy giną'],
+  },
+];
+const UP_MAX = 8;
+const upCost = l => 25 + 20 * l + 5 * l * l;
+// Talenty: każda zdobyta gwiazdka to punkt. Gałąź ma 4 stopnie, a każdy stopień wymaga poprzedniego.
+const BRANCHES = ['Miecz', 'Łuk', 'Dusza'];
+const TALENTS = [
+  { id: 'leech', b: 0, t: 0, cost: 1, name: 'Pijawka', desc: '4% obrażeń mieczem leczy bohatera' },
+  { id: 'wave', b: 0, t: 1, cost: 1, name: 'Fala ostrza', desc: 'trzecie cięcie posyła falę przed siebie' },
+  { id: 'fury', b: 0, t: 2, cost: 2, name: 'Szał', desc: 'przy serii 15+ tniesz o 30% szybciej' },
+  { id: 'exec', b: 0, t: 3, cost: 3, name: 'Egzekucja', desc: '+60% obrażeń wrogom poniżej 30% zdrowia' },
+  { id: 'pierce', b: 1, t: 0, cost: 1, name: 'Przebicie', desc: 'strzała przebija dwóch wrogów' },
+  { id: 'volley', b: 1, t: 1, cost: 1, name: 'Salwa', desc: 'łuk wypuszcza 3 strzały wachlarzem' },
+  { id: 'quick', b: 1, t: 2, cost: 2, name: 'Szybka cięciwa', desc: 'łuk odnawia się o 35% szybciej' },
+  {
+    id: 'hunter',
+    b: 1,
+    t: 3,
+    cost: 3,
+    name: 'Łowca',
+    desc: 'po każdym uniku następna strzała jest krytyczna',
+  },
+  { id: 'alch', b: 2, t: 0, cost: 1, name: 'Alchemia', desc: 'mikstura odnawia się o 30% szybciej' },
+  { id: 'storm', b: 2, t: 1, cost: 1, name: 'Burza', desc: 'wir sięga dalej i przyciąga wrogów' },
+  { id: 'second', b: 2, t: 2, cost: 2, name: 'Druga szansa', desc: 'raz na etap przeżywasz śmiertelny cios' },
+  {
+    id: 'reaper',
+    b: 2,
+    t: 3,
+    cost: 3,
+    name: 'Żniwiarz',
+    desc: 'każdy pokonany wróg skraca odnowienie wiru o 0,6 s',
+  },
+];
+let TAL = {};

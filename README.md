@@ -4,6 +4,11 @@ Przeglądarkowa gra akcji w klockowym 3D. Chodzisz bohaterem po wyspach połącz
 
 **Zagraj:** https://babuuc.github.io/kostkowe-lochy/
 
+## Rozwój postaci
+
+- **Ulepszenia za odłamki:** Ostrze, Serce, Buty i Golemy, po 8 poziomów. Poziomy 4 i 8 dają dodatkowe premie, na przykład szansę na krytyk, regenerację albo wybuchające golemy.
+- **Talenty za gwiazdki:** każda zdobyta gwiazdka to punkt. Trzy gałęzie (Miecz, Łuk, Dusza) po cztery stopnie; każdy stopień wymaga poprzedniego, a reset jest darmowy.
+
 ## Sterowanie
 
 | | Komputer | Telefon |

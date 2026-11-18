@@ -60,7 +60,7 @@ function heroAttack() {
   const fin = h.combo === 2;
   h.swingT = h.swingDur = fin ? 0.32 : 0.24;
   h.swingKind = h.combo;
-  h.cd.atk = (fin ? 0.52 : 0.3) * h.cdMul;
+  h.cd.atk = (fin ? 0.52 : 0.3) * h.cdMul * (TAL.fury && h.comboN >= 15 ? 0.7 : 1);
   h.hitPending = true;
   h.hitT = fin ? 0.13 : 0.09;
   const s = Math.sin(h.face),
@@ -92,11 +92,18 @@ function heroStrike() {
       dz = u.z - h.z,
       d = Math.hypot(dx, dz);
     if (d < range + u.r && (d < 1 || Math.abs(angDiff(h.face, Math.atan2(dx, dz))) < arc / 2)) {
-      const crit = focus || Math.random() < 0.12;
-      if (
-        hurt(u, h.atk * mul * (fin ? 1.8 : 1) * rnd(0.9, 1.1) * (crit ? 2 : 1), h.x, h.z, fin ? 11 : 6, crit)
-      )
+      const crit = focus || Math.random() < h.critC,
+        dmg =
+          h.atk *
+          mul *
+          (fin ? 1.8 : 1) *
+          rnd(0.9, 1.1) *
+          (crit ? h.critM : 1) *
+          (TAL.exec && u.hp < u.maxHp * 0.3 ? 1.6 : 1);
+      if (hurt(u, dmg, h.x, h.z, fin ? 11 : 6, crit)) {
         hits++;
+        if (TAL.leech) h.hp = Math.min(h.maxHp, h.hp + dmg * 0.04);
+      }
       critAny = critAny || crit;
     }
   }
@@ -113,6 +120,21 @@ function heroStrike() {
     }
   }
   smashUrns(h.x, h.z, range, h.face, arc);
+  if (fin && TAL.wave) {
+    // fala ostrza: trafia wrogów dalej przed bohaterem
+    const s = Math.sin(h.face),
+      c = Math.cos(h.face);
+    for (let k = 1; k <= 5; k++)
+      burst(h.x + s * (1.2 + k), 0.5, h.z + c * (1.2 + k), 0xbff4ff, 2, 2, 0.1, 0.35, 0);
+    for (const u of units) {
+      if (u.team !== 1 || u.dead) continue;
+      const dx = u.x - h.x,
+        dz = u.z - h.z,
+        d = Math.hypot(dx, dz);
+      if (d > range + u.r && d < 6.5 && Math.abs(angDiff(h.face, Math.atan2(dx, dz))) < 0.4)
+        if (hurt(u, h.atk * mul * 1.1, h.x, h.z, 6)) hits++;
+    }
+  }
   if (fin) {
     const s = Math.sin(h.face),
       c = Math.cos(h.face);
@@ -133,6 +155,7 @@ function updateHero(dt) {
   const h = hero;
   if (h.dead) return;
   for (const k in h.cd) if (h.cd[k] > 0) h.cd[k] -= dt;
+  if (h.regen && h.hp < h.maxHp) h.hp = Math.min(h.maxHp, h.hp + h.regen * dt);
   if (h.inv > 0) h.inv -= dt;
   if (h.focus > 0) h.focus -= dt;
   if (h.comboT > 0) {
@@ -164,12 +187,13 @@ function updateHero(dt) {
   if (inp.potion > 0) inp.potion -= dt;
   if (h.rollT > 0) {
     h.rollT -= dt;
-    moveCircle(h, h.rollX * ROLL_SPD * dt, h.rollZ * ROLL_SPD * dt);
+    moveCircle(h, h.rollX * h.rollSpd * dt, h.rollZ * h.rollSpd * dt);
     if (Math.random() < 0.6) burst(h.x, 0.2, h.z, theme.dust, 1, 1.5, 0.12, 0.3, 2);
     if (h.rollT <= 0) {
       h.vx = h.rollX * h.speed;
       h.vz = h.rollZ * h.speed;
-      h.inv = Math.max(h.inv, 0.08);
+      h.inv = Math.max(h.inv, h.rollInv);
+      if (TAL.hunter) h.hunter = true;
       h.pop = 0.7;
       burst(h.x, 0.1, h.z, theme.dust, 5, 2.4, 0.12, 0.35, 3);
     }
@@ -208,7 +232,24 @@ function updateHero(dt) {
       h.bowT = 0.24;
       const s = Math.sin(h.face),
         c = Math.cos(h.face);
-      shoot(h.x + s * 0.6, h.z + c * 0.6, s, c, 26, 0, h.atk * 1.15 * comboMul() * (h.focus > 0 ? 2 : 1));
+      const crit = h.focus > 0 || h.hunter,
+        dmgA = h.atk * 1.15 * comboMul() * (crit ? 2 : 1),
+        ex = { pierce: TAL.pierce ? 2 : 0, crit };
+      for (const da of TAL.volley ? [-0.17, 0, 0.17] : [0]) {
+        const a2 = h.face + da;
+        shoot(
+          h.x + Math.sin(a2) * 0.6,
+          h.z + Math.cos(a2) * 0.6,
+          Math.sin(a2),
+          Math.cos(a2),
+          26,
+          0,
+          dmgA * (da ? 0.7 : 1),
+          'arrow',
+          ex
+        );
+      }
+      h.hunter = false;
       if (h.focus > 0) h.focus = 0;
       h.kx -= s * 1.5;
       h.kz -= c * 1.5;
@@ -218,7 +259,7 @@ function updateHero(dt) {
       if (h.cd.potion <= 0 && h.hp < h.maxHp) {
         inp.potion = 0;
         h.cd.potion = h.max.potion;
-        healHero(h.maxHp * 0.5);
+        healHero(h.maxHp * h.potHeal);
         burst(h.x, 1, h.z, 0xff8fa0, 14, 3.5, 0.14, 0.8, -3);
         flash(h.x, 1.5, h.z, 0xff8fa0, 1.2, 0.4, 8);
         sfx.heal();
@@ -271,21 +312,31 @@ function heroSpin() {
   sfx.spec();
   shake(0.4);
   let hits = 0;
+  const R = TAL.storm ? 4.8 : 3.8;
+  if (TAL.storm) waveFx(h.x, h.z, 4.8, 0.6, 0x9fe8ff, 0.5);
   for (const u of units) {
     if (u.team !== 1 || u.dead) continue;
-    if (Math.hypot(u.x - h.x, u.z - h.z) < 3.8 + u.r) {
-      if (hurt(u, h.atk * 2.6 * mul, h.x, h.z, 14, true)) hits++;
+    const dx = u.x - h.x,
+      dz = u.z - h.z,
+      d = Math.hypot(dx, dz) || 1;
+    if (d < R + u.r) {
+      if (hurt(u, h.atk * 2.6 * mul, h.x, h.z, TAL.storm ? 0 : 14, true)) hits++;
+      if (TAL.storm && !u.def.heavy && !u.dead) {
+        // burza przyciąga wrogów do bohatera
+        u.kx = (-dx / d) * Math.min(9, d * 3);
+        u.kz = (-dz / d) * Math.min(9, d * 3);
+      }
       u.stun = Math.max(u.stun, 0.5);
     }
   }
   for (const n of nodes) {
-    if (n.own === 1 && Math.hypot(n.x - h.x, n.z - h.z) < 3.8 + n.r) {
+    if (n.own === 1 && Math.hypot(n.x - h.x, n.z - h.z) < R + n.r) {
       const sh = n.shield;
       hurtNode(n, h.atk * 2.6 * mul, 0);
       if (!sh) hits++;
     }
   }
-  smashUrns(h.x, h.z, 3.8);
+  smashUrns(h.x, h.z, R);
   if (hits) {
     addCombo(hits);
     hitstop = 0.08;
