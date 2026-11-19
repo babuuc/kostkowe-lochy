@@ -148,12 +148,14 @@ for (let i = 0; i < 12; i++) {
   waves.push({ m, mt, t: 0, dur: 0.4, r0: 0.5, r1: 3 });
 }
 let waveI = 0;
-function waveFx(x, z, r0, r1, color, dur) {
+let gemStreak = 0,
+  gemLastT = -9;
+function waveFx(x, z, r0, r1, color, dur, y) {
   const w = waves[waveI++ % 12];
   w.t = w.dur = dur || 0.4;
   w.r0 = r0;
   w.r1 = r1;
-  w.m.position.set(x, 0.08, z);
+  w.m.position.set(x, y === undefined ? 0.08 : y, z);
   w.mt.color.setHex(color);
   w.m.visible = true;
 }
@@ -500,8 +502,10 @@ function updatePickups(dt) {
           healHero(12);
         } else {
           save.gems++;
+          gemStreak = time - gemLastT < 0.6 ? Math.min(gemStreak + 1, 14) : 0;
+          gemLastT = time;
           runGems++;
-          sfx.gem();
+          sfx.gem(gemStreak);
         }
         p.m.visible = false;
         gemPool.push(p.m);

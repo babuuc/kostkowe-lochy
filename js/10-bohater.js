@@ -140,6 +140,7 @@ function heroStrike() {
         if (hurt(u, h.atk * mul * 1.1, h.x, h.z, 6)) hits++;
     }
   }
+  if (fin && hits > 0) camPunch(Math.sin(h.face), Math.cos(h.face), 0.28);
   if (fin) {
     const s = Math.sin(h.face),
       c = Math.cos(h.face);
@@ -385,6 +386,7 @@ function animHero(dt) {
   const side = sn >= 0 ? 1 : -1;
   if (side !== h.stepS) {
     h.stepS = side;
+    if (mv > 0.5 && h.rollT <= 0 && state === 'play') heroStep();
     if (mv > 0.6 && h.rollT <= 0)
       burst(
         h.x - Math.sin(h.face) * 0.25,

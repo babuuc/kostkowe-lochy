@@ -102,8 +102,17 @@ const sfx = {
     tone(420, 0.1, 'triangle', 0.16, -250);
     noise(0.06, 0.1, 2600, 1);
   },
-  gem() {
-    tone(pick([988, 1175, 1319]), 0.09, 'square', 0.06);
+  gem(n) {
+    // każdy kolejny odłamek w serii brzmi o półton wyżej
+    tone(988 * Math.pow(2, (n || 0) / 12), 0.09, 'square', 0.06);
+  },
+  lava() {
+    noise(0.8, 0.18, 160, 0.5, 0, 'lowpass');
+    noise(0.4, 0.06, 1400, 0.6);
+  },
+  heart() {
+    tone(62, 0.12, 'sine', 0.22, -10);
+    tone(58, 0.14, 'sine', 0.18, -10, 0.18);
   },
   heal() {
     tone(523, 0.14, 'triangle', 0.14);

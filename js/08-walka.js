@@ -60,6 +60,7 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
     }
     if (hero.inv > 0) return false;
     hero.hp -= dmg;
+    camPunch(hero.x - fx, hero.z - fz, 0.35);
     if (hero.hp <= 0 && TAL.second && !hero.secondUsed) {
       // druga szansa: raz na etap bohater zostaje przy życiu
       hero.secondUsed = true;
@@ -155,6 +156,10 @@ function hurtNode(n, dmg, by) {
   }
 }
 function capture(n) {
+  camZoomKick(-0.12);
+  slowmo = Math.max(slowmo, 0.25);
+  // konfetti w kolorach kapliczki i złota
+  for (const c of [COL_P, 0xffffff, 0xffc23d]) debris.burst(n.x, 2.6, n.z, c, 8, 8, 0.16, 1.4);
   n.own = 0;
   n.hp = n.maxHp;
   n.timer = 3;
@@ -416,6 +421,9 @@ function respawnHero() {
 function win() {
   if (ending) return;
   ending = { kind: 'win', t: 1.9 };
+  // zwycięstwo: zwolnienie czasu i przybliżenie
+  slowmo = 1.1;
+  camZoomKick(-0.18);
   sfx.win();
   for (const u of units) if (u.team === 1 && !u.dead) die(u, true);
 }

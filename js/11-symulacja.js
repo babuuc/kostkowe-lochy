@@ -347,6 +347,7 @@ function updateAmbient(dt) {
   updateBossFx(dt);
   updatePrinceFx(dt);
   updatePrinceFx2(dt);
+  updateWorldLife(dt);
   updateDmg(dt);
   updateCorpses(dt);
   updateLights(dt);
@@ -402,7 +403,7 @@ function updateCamera(dt) {
     camT.z = damp(camT.z, tz, 6.5, dt);
     camZoom = damp(camZoom, zoom, 2, dt);
   }
-  if (state !== 'menu') d *= camZoom;
+  if (state !== 'menu') d *= camZoom * camFxStep(dt);
   trauma = Math.max(0, trauma - dt * 1.9);
   const s = trauma * trauma * 0.7,
     ox = (Math.random() - 0.5) * s,
@@ -410,12 +411,14 @@ function updateCamera(dt) {
     oz = (Math.random() - 0.5) * s;
   const cp = Math.cos(CAM_PITCH),
     spv = Math.sin(CAM_PITCH);
+  const px = camFx.px,
+    pz = camFx.pz;
   camera.position.set(
-    camT.x + Math.sin(yaw) * cp * d + ox,
+    camT.x + Math.sin(yaw) * cp * d + ox + px,
     spv * d + oy,
-    camT.z + Math.cos(yaw) * cp * d + oz
+    camT.z + Math.cos(yaw) * cp * d + oz + pz
   );
-  camera.lookAt(camT.x + ox, 0.7 + oy, camT.z + oz);
+  camera.lookAt(camT.x + ox + px, 0.7 + oy, camT.z + oz + pz);
   scene.fog.near = d + (theme.fogN !== undefined ? theme.fogN : 4);
   scene.fog.far = d + (theme.fogF !== undefined ? theme.fogF : 46);
   // cień: środek przyciągany do siatki tekseli, żeby krawędzie nie migotały przy ruchu kamery

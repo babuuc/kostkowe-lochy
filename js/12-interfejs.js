@@ -20,17 +20,27 @@ function buildPips() {
     p.appendChild(i);
   }
 }
+let heartT = 0,
+  ghostF = 1,
+  ghostHold = 0,
+  ghostLast = 1,
+  ghostShown = -1;
 function updateHud(dt) {
   const h = hero,
     hp = Math.max(0, Math.ceil(h.hp));
   if (hp !== lastHp) {
     lastHp = hp;
-    $('hpfill').style.width = ((hp / h.maxHp) * 100).toFixed(1) + '%';
+    const w = ((hp / h.maxHp) * 100).toFixed(1) + '%';
+    $('hpfill').style.width = w;
     $('hptext').textContent = hp + ' / ' + h.maxHp;
   }
   if (save.gems !== lastGems) {
     lastGems = save.gems;
     $('gemn').textContent = save.gems;
+    const gb = $('gemn').parentNode;
+    gb.classList.remove('bump');
+    void gb.offsetWidth;
+    gb.classList.add('bump');
   }
   if (h.lives !== lastLives) {
     lastLives = h.lives;
@@ -130,6 +140,25 @@ function updateHud(dt) {
     }
     if (ar.hidden === show) ar.hidden = !show;
   }
+  // biały „ślad” po utraconym zdrowiu: chwilę stoi, potem zjeżdża do aktualnej wartości
+  const frac = clamp(h.hp / h.maxHp, 0, 1);
+  if (frac < ghostLast - 0.001) ghostHold = 0.45;
+  ghostLast = frac;
+  if (frac >= ghostF) ghostF = frac;
+  else if (ghostHold > 0) ghostHold -= dt;
+  else ghostF = Math.max(frac, ghostF - dt * 0.8);
+  if (Math.abs(ghostF - ghostShown) > 0.002) {
+    ghostShown = ghostF;
+    $('hpghost').style.width = (ghostF * 100).toFixed(1) + '%';
+  }
+  // bicie serca przy niskim zdrowiu
+  if (!h.dead && h.hp < h.maxHp * 0.3) {
+    heartT -= dt;
+    if (heartT <= 0) {
+      heartT = 0.85;
+      sfx.heart();
+    }
+  } else heartT = 0;
   if (banT > 0) {
     banT -= dt;
     if (banT <= 0) $('banner').classList.remove('show');
@@ -362,6 +391,7 @@ function startLevel(i) {
   buildWorld(i);
   resetHero();
   artSetup();
+  camIntro();
   // shadery wszystkich materiałów kompilujemy od razu, żeby gra nie przycinała przy pierwszym użyciu
   renderer.compile(scene, camera);
   state = 'play';

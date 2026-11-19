@@ -55,7 +55,8 @@ js/15-artefakty.js    artefakty w grze (róg, totem, mróz, grom, płaszcz)
 js/16-rozwoj.js       ekran rozwoju bohatera: postać, ulepszenia, talenty, artefakty
 js/17-mrok.js         mrok w ciemnych etapach i pole widzenia
 js/18-ksiaze.js       Książę Zmierzchu: ostateczny boss w pięciu fazach
-js/19-start.js        pętla główna i uruchomienie gry
+js/19-zycie.js        życie świata i odczucia: kamera, motyle, ryby, wiry piasku, gejzery, dźwięki otoczenia
+js/20-start.js        pętla główna i uruchomienie gry
 ```
 
 Nowy etap dodaje się w `js/04-dane.js` (tablica `LEVELS`): położenie i promień kapliczek, połączenia mostami oraz lista przeciwników każdej kapliczki.

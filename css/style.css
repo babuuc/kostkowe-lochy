@@ -1776,3 +1776,30 @@ button.srow.sel {
 #bosshp.five div::after {
   display: none;
 }
+
+/* ślad po utraconym zdrowiu i podskok licznika odłamków */
+.hpbar {
+  overflow: hidden;
+}
+#hpghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  background: #fff2c8;
+}
+#hpfill {
+  position: relative;
+}
+.price.bump {
+  animation: gbump 0.25s ease-out;
+}
+@keyframes gbump {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
