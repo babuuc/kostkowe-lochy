@@ -493,9 +493,36 @@ function animHero(dt) {
   P.elbL.rotation.x = damp(P.elbL.rotation.x, el, 20, dt);
   P.body.position.y = P.hipY - Math.abs(sn) * 0.05 * mv + Math.sin(time * 2.2) * 0.012;
   P.head.rotation.x = Math.sin(h.phase * 2) * 0.05 * mv - h.pop * 0.25;
+  // bohater patrzy na najbliższego wroga w pobliżu, a bez wrogów rozgląda się
+  h.lookT -= dt;
+  if (!(h.lookT > 0)) {
+    h.lookT = 0.25;
+    h.look = null;
+    let bd = 7;
+    for (const u of units)
+      if (u.team === 1 && !u.dead && u.spawnT <= 0) {
+        const d = Math.abs(u.x - h.x) + Math.abs(u.z - h.z);
+        if (d < bd) {
+          bd = d;
+          h.look = u;
+        }
+      }
+  }
+  const br = Math.sin(time * 2.2) * 0.018 * (1 - mv);
+  P.body.scale.set(1 + br * 0.5, 1 + br, 1 + br * 0.5);
+  const lookY =
+    h.look && !h.look.dead
+      ? clamp(angDiff(h.face, Math.atan2(h.look.x - h.x, h.look.z - h.z)), -0.9, 0.9)
+      : null;
   P.head.rotation.y = damp(
     P.head.rotation.y,
-    mv < 0.05 && !swinging && h.bowT <= 0 ? Math.sin(time * 0.7) * 0.32 : -P.body.rotation.y * 0.5,
+    swinging || h.bowT > 0
+      ? -P.body.rotation.y * 0.5
+      : lookY !== null
+        ? lookY - P.body.rotation.y * 0.5
+        : mv < 0.05
+          ? Math.sin(time * 0.7) * 0.32
+          : -P.body.rotation.y * 0.5,
     8,
     dt
   );
@@ -520,7 +547,16 @@ function animHero(dt) {
   const extra = h.spinT > 0 ? (1 - h.spinT / 0.42) * TAU * 2 : 0,
     px = 1 + h.pop * 0.14;
   h.root.position.set(h.x, y, h.z);
-  h.root.rotation.set(-h.pop * 0.18, h.face + extra, sn * 0.03 * mv);
+  let hl = -h.pop * 0.18,
+    hr = sn * 0.03 * mv;
+  if (h.flinch > 0) {
+    const ra = angDiff(h.face, h.hitA),
+      f = h.flinch * h.flinch;
+    hl = Math.cos(ra) * 0.3 * f;
+    hr -= Math.sin(ra) * 0.26 * f;
+    h.flinch = Math.max(0, h.flinch - dt * 4.5);
+  }
+  h.root.rotation.set(hl, h.face + extra, hr);
   h.root.scale.set(px, 1 - h.pop * 0.12, px);
   h.root.visible = !(h.inv > 0 && h.rollT <= 0 && h.cloakT <= 0 && Math.floor(time * 30) % 3 === 0);
   h.blob.position.set(h.x, 0.032, h.z);

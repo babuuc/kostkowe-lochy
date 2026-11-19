@@ -86,6 +86,8 @@ function buildPrince(root) {
     bone = 0xd8d2c0,
     cloth = 0x56101e;
   const P = humanoid(root, {
+    hands: false,
+    feet: false,
     legH: 0.85,
     legW: 0.42,
     legC: sd,

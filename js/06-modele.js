@@ -20,6 +20,20 @@ function humanoid(g, o) {
     knee.position.y = -th;
     hip.add(knee);
     box(knee, o.legW * 0.94, sh, o.legW * 0.94, o.shinC || o.legC, 0, -sh / 2, 0);
+    // stopa wysunięta do przodu: postać lepiej stoi na ziemi
+    if (o.feet !== false)
+      box(
+        knee,
+        o.legW * 1.04,
+        o.legW * 0.42,
+        o.legW * 1.45,
+        o.footC || shade(o.shinC || o.legC, -0.2),
+        0,
+        -sh + o.legW * 0.2,
+        o.legW * 0.24,
+        0,
+        1
+      );
     P[s < 0 ? 'legL' : 'legR'] = hip;
     P[s < 0 ? 'kneeL' : 'kneeR'] = knee;
   }
@@ -40,6 +54,20 @@ function humanoid(g, o) {
     el.position.y = -ua + 0.06;
     sho.add(el);
     box(el, o.armW * 0.96, fa, o.armW * 0.96, o.foreC || o.armC, 0, -fa / 2, 0);
+    // dłoń na końcu przedramienia
+    if (o.hands !== false)
+      box(
+        el,
+        o.armW * 1.12,
+        o.armW * 0.7,
+        o.armW * 1.12,
+        o.handC || shade(o.foreC || o.armC, -0.12),
+        0,
+        -fa - o.armW * 0.2,
+        0,
+        0,
+        1
+      );
     P[s < 0 ? 'armL' : 'armR'] = sho;
     P[s < 0 ? 'elbL' : 'elbR'] = el;
   }
@@ -660,6 +688,8 @@ const hero = {
     skin = 0xe8b88a,
     wood = 0x7a5230;
   const P = humanoid(model, {
+    hands: false,
+    feet: false,
     legH: 0.42,
     legW: 0.2,
     legC: 0x3b3550,

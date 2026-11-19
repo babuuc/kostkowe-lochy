@@ -60,6 +60,10 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
     }
     if (hero.inv > 0) return false;
     hero.hp -= dmg;
+    if (isFinite(fx) && isFinite(fz) && (hero.x !== fx || hero.z !== fz)) {
+      hero.flinch = 1;
+      hero.hitA = Math.atan2(hero.x - fx, hero.z - fz);
+    }
     camPunch(hero.x - fx, hero.z - fz, 0.35);
     if (hero.hp <= 0 && TAL.second && !hero.secondUsed) {
       // druga szansa: raz na etap bohater zostaje przy życiu
@@ -86,6 +90,11 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
   }
   t.flash = 0.09;
   t.pop = 1;
+  // postać odchyla się w stronę, w którą pchnął ją cios
+  if (isFinite(fx) && isFinite(fz) && (t.x !== fx || t.z !== fz)) {
+    t.flinch = 1;
+    t.hitA = Math.atan2(t.x - fx, t.z - fz);
+  }
   setFlash(t, true);
   const dx = t.x - fx,
     dz = t.z - fz,
@@ -1110,6 +1119,11 @@ function animUnit(u, dt) {
     P.body.rotation.y = damp(P.body.rotation.y, byaw, 14, dt);
     P.body.position.y =
       P.hipY - Math.abs(sn) * (heavy ? 0.07 : 0.05) * mv + Math.sin(time * 2.1 + u.seed) * 0.012;
+    // głowa śledzi cel, a bez celu rozgląda się
+    if (hy === null && u.tgt && !u.tgt.dead && !wind && !rec)
+      hy = clamp(angDiff(u.face, Math.atan2(u.tgt.x - u.x, u.tgt.z - u.z)), -0.9, 0.9) - byaw * 0.6;
+    const br = Math.sin(time * 2.2 + u.seed) * 0.02 * (1 - mv);
+    P.body.scale.set(1 + br * 0.5, 1 + br, 1 + br * 0.5);
     P.head.rotation.y = damp(
       P.head.rotation.y,
       hy !== null ? hy : wind || rec ? 0 : Math.sin(time * 0.8 + u.seed) * 0.32 * (1 - mv) - byaw * 0.6,
@@ -1127,7 +1141,23 @@ function animUnit(u, dt) {
       }
     }
     lean = -u.pop * 0.22;
+    if (u.flinch > 0) {
+      const ra = angDiff(u.face, u.hitA),
+        f = u.flinch * u.flinch;
+      lean = Math.cos(ra) * 0.34 * f - u.pop * 0.08;
+      roll -= Math.sin(ra) * 0.3 * f;
+    }
   }
+  // przed ciosem postać przysiada na ugiętych kolanach (wyczuwalny ciężar ataku)
+  if (wind && P.kneeL && !P.prince && !P.lich) {
+    const c = wk * (u.def.heavy ? 1.5 : 1);
+    P.kneeL.rotation.x += 0.45 * c;
+    P.kneeR.rotation.x += 0.45 * c;
+    P.legL.rotation.x -= 0.22 * c;
+    P.legR.rotation.x -= 0.22 * c;
+    y -= 0.05 * c;
+  }
+  if (u.flinch > 0) u.flinch = Math.max(0, u.flinch - dt * 4.5);
   if (u.bones > 0) {
     // leży jako stos kości; tuż przed wstaniem drży
     lean = -1.45;
