@@ -121,6 +121,7 @@ const ART_FX = {
     waveFx(h.x, h.z, 0.5, v.r, 0x9fe8ff, 0.5);
     waveFx(h.x, h.z, 0.3, v.r * 0.7, 0xffffff, 0.35);
     burst(h.x, 0.8, h.z, 0xcff4ff, 30, 7, 0.16, 0.7, 4);
+    streaks(h.x, 0.8, h.z, 0, Math.PI, 24, 11, 0xcff4ff, 0.8, 0.3);
     flash(h.x, 1.5, h.z, 0x9fe8ff, 2.4, 0.5, 12);
     sfx.crystal();
     sfx.shieldBreak();
@@ -146,6 +147,7 @@ const ART_FX = {
     if (!list.length) dmgNum(h.x, h.h + 0.6, h.z, 'brak celów', 'ally');
     list.forEach((u, i) => {
       boltFx(u.x, u.z, i * 0.06);
+      streaks(u.x, 0.5, u.z, 0, Math.PI, 8, 8, 0xe8f4ff, 0.6, 0.22);
       hurt(u, v.dmg, u.x, u.z + 0.01, 3, true);
     });
     flash(h.x, 4, h.z, 0xcfe8ff, 3, 0.35, 18);

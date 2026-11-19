@@ -357,6 +357,7 @@ function updatePrinceFx(dt) {
     }
     if (m.t <= 0) {
       m.m.visible = false;
+      explodeFx(m.x, m.z, 1.8, 0xff5a20);
       waveFx(m.x, m.z, 0.4, 2.2, 0xff6030, 0.4);
       burst(m.x, 0.4, m.z, 0xff8040, 18, 7, 0.16, 0.6);
       debris.burst(m.x, 0.3, m.z, theme.side[0], 6, 6, 0.2, 0.8);
@@ -872,6 +873,7 @@ function princeAct(u, a, dt) {
       burst(u.x, 0.3, u.z, theme.dust, 18, 6, 0.18, 0.5);
       debris.burst(u.x, 0.2, u.z, theme.side[1], 10, 6, 0.2, 0.8);
       decal(u.x, u.z, 3, 3);
+      dustFx(u.x, u.z, 3);
       flash(u.x, 1, u.z, PRINCE_C, 2, 0.35, 12);
       sfx.quake();
       shake(0.7);

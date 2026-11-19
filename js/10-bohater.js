@@ -291,6 +291,10 @@ function updateHero(dt) {
   if (h.swingT > 0) h.swingT -= dt;
   if (h.bowT > 0) h.bowT -= dt;
   if (h.spinT > 0) h.spinT -= dt;
+  if (h.rollT > 0 && Math.random() < 0.7) {
+    const ba = h.face + Math.PI;
+    streaks(h.x + rnd(-0.3, 0.3), rnd(0.3, 1.3), h.z + rnd(-0.3, 0.3), ba, 0.15, 1, 7, 0xd8f4ff, 0.7, 0.16);
+  }
   if (h.spin2T > 0) {
     h.spin2T -= dt;
     if (h.spin2T <= 0) heroSpin(true);

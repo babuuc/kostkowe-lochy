@@ -90,10 +90,18 @@ function hurt(t, dmg, fx, fz, kb, crit, by) {
   }
   t.flash = 0.09;
   t.pop = 1;
-  // postać odchyla się w stronę, w którą pchnął ją cios
+  // postać odchyla się w stronę, w którą pchnął ją cios, a z miejsca trafienia lecą iskry
   if (isFinite(fx) && isFinite(fz) && (t.x !== fx || t.z !== fz)) {
     t.flinch = 1;
     t.hitA = Math.atan2(t.x - fx, t.z - fz);
+    hitSparks(
+      t.x - Math.sin(t.hitA) * t.r * 0.6,
+      t.h * (t.baseScale || 1) * 0.55,
+      t.z - Math.cos(t.hitA) * t.r * 0.6,
+      t.hitA,
+      !!crit,
+      t.def && t.def.bones ? 0xf0ead8 : undefined
+    );
   }
   setFlash(t, true);
   const dx = t.x - fx,
@@ -169,6 +177,7 @@ function capture(n) {
   slowmo = Math.max(slowmo, 0.25);
   // konfetti w kolorach kapliczki i złota
   for (const c of [COL_P, 0xffffff, 0xffc23d]) debris.burst(n.x, 2.6, n.z, c, 8, 8, 0.16, 1.4);
+  captureBeam(n.x, n.z);
   n.own = 0;
   n.hp = n.maxHp;
   n.timer = 3;
@@ -302,6 +311,10 @@ function die(u, silent) {
     kills++;
     if (TAL.reaper && !silent) hero.cd.spec = Math.max(0, hero.cd.spec - 0.6);
     if (u.home && !u.raid && !u.def.boss && u.home.own === 1) u.home.kids--;
+    if (!silent) {
+      sparks.burst(u.x, u.h * u.baseScale * 0.6, u.z, 0xffffff, 3, 0.6, 0.09, 1.0, -3.5);
+      if (u.def.heavy) dustFx(u.x, u.z, 1.4);
+    }
     if (!u.noLoot) {
       const g = u.def.gems * (u.elite ? 3 : 1) + (hero.comboN >= 10 ? 1 : 0);
       for (let k = 0; k < g; k++) dropGem(u.x, u.z);
@@ -311,6 +324,7 @@ function die(u, silent) {
     if (u.home && u.home.own === 0) u.home.allies = Math.max(0, u.home.allies - 1);
     if (u.type === 'golem' && save.up.gol >= 8 && !silent) {
       // golemy z ulepszeniem 8 wybuchają przy śmierci
+      explodeFx(u.x, u.z, 2.4, COL_P);
       waveFx(u.x, u.z, 0.4, 2.4, COL_P, 0.35);
       burst(u.x, 0.6, u.z, COL_P, 16, 6, 0.14, 0.5);
       sfx.boom();
@@ -573,6 +587,7 @@ function beginWind(u, t) {
 }
 function explode(u) {
   const R = u.def.bomb;
+  explodeFx(u.x, u.z, R, 0xff8a2a);
   waveFx(u.x, u.z, 0.5, R, 0xff8a2a, 0.35);
   waveFx(u.x, u.z, 0.3, R * 0.6, 0xffe08a, 0.25);
   burst(u.x, 0.5, u.z, 0xffa23a, 26, 9, 0.2, 0.6);

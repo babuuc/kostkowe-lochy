@@ -348,6 +348,7 @@ function updateAmbient(dt) {
   updatePrinceFx(dt);
   updatePrinceFx2(dt);
   updateWorldLife(dt);
+  updateFx2(dt);
   updateDmg(dt);
   updateCorpses(dt);
   updateLights(dt);
