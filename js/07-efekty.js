@@ -639,6 +639,29 @@ function updateProjs(dt) {
     p.z += p.vz * dt;
     p.life -= dt;
     p.spin += dt * 7;
+    if (Math.random() < 0.6) {
+      const back = Math.atan2(-p.vx, -p.vz);
+      streaks(
+        p.x,
+        0.95,
+        p.z,
+        back,
+        0.08,
+        1,
+        2.5,
+        p.team === 0
+          ? p.crit
+            ? 0xffe08a
+            : 0xfff4d8
+          : p.kind === 'soul'
+            ? 0x7fffd8
+            : p.kind === 'blade'
+              ? 0xff7080
+              : 0xe0a0ff,
+        0.55,
+        0.14
+      );
+    }
     let gone = p.life <= 0;
     if (!gone && p.x > 0 && p.z > 0 && p.x < G && p.z < G && grid[cellOf(p.x, p.z)] === 3) {
       gone = true;

@@ -17,7 +17,10 @@ const coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').ma
 let pixelRatio = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
 renderer.setPixelRatio(pixelRatio);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.type =
+  window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+    ? THREE.PCFShadowMap
+    : THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x10262e);
 scene.fog = new THREE.Fog(0x10262e, 30, 80);
@@ -119,16 +122,25 @@ const noiseTex = (function () {
   t.needsUpdate = true;
   return t;
 })();
+// poświata krawędzi postaci w kolorze nieba danego etapu (ustawiana w buildWorld)
+const RIMU = { value: new THREE.Color(0x9ad0ff) };
 function texMat(m, kind) {
   m.onBeforeCompile = sh => {
     sh.uniforms.tNoise = { value: noiseTex };
     sh.uniforms.uTime = TIMEU;
+    sh.uniforms.uRimC = RIMU;
     let v = sh.vertexShader.replace(
       '#include <common>',
       '#include <common>\nvarying vec3 vTp; varying vec3 vTn; uniform float uTime;'
     );
     if (kind === 'char')
-      v = v.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTp=position*2.0; vTn=normal;');
+      v = v
+        .replace('#include <common>', '#include <common>\nvarying vec3 vRn; varying vec3 vRv;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTp=position*2.0; vTn=normal;')
+        .replace(
+          '#include <project_vertex>',
+          '#include <project_vertex>\nvRn=normalize(normalMatrix*objectNormal); vRv=-mvPosition.xyz;'
+        );
     else
       v = v.replace(
         '#include <begin_vertex>',
@@ -148,12 +160,27 @@ function texMat(m, kind) {
       '#include <color_fragment>',
       '#include <color_fragment>\nvec3 tAn=abs(vTn); vec2 tUv=tAn.y>0.5?vTp.xz:(tAn.x>0.5?vTp.zy:vTp.xy);\ndiffuseColor.rgb*=0.915+texture2D(tNoise,tUv*0.25).r*0.17;' +
         (kind === 'tile'
-          ? '\nvec2 tGf=abs(fract(tUv)-0.5); diffuseColor.rgb*=1.0-step(0.468,max(tGf.x,tGf.y))*0.085;'
-          : '')
+          ? // płytki: wypukła krawędź (jaśniejsza z jednej strony, ciemniejsza z drugiej) i ściany ciemniejące ku dołowi
+            '\nif(tAn.y>0.5){vec2 tFr=fract(vTp.xz); float tHi=step(tFr.x,0.07)+step(tFr.y,0.07); float tLo=step(0.93,tFr.x)+step(0.93,tFr.y); diffuseColor.rgb*=1.0+min(tHi,1.0)*0.07-min(tLo,1.0)*0.11;}' +
+            '\nelse{diffuseColor.rgb*=0.62+0.38*smoothstep(-2.6,0.05,vTp.y);}'
+          : kind === 'prop'
+            ? // dekoracje: cień kontaktowy u podstawy
+              '\ndiffuseColor.rgb*=mix(0.74,1.0,smoothstep(0.0,0.7,vTp.y));'
+            : '')
     );
     sh.fragmentShader = f;
+    if (kind === 'char')
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform vec3 uRimC; varying vec3 vRn; varying vec3 vRv;'
+        )
+        .replace(
+          '#include <dithering_fragment>',
+          '#include <dithering_fragment>\nfloat rimF=1.0-max(dot(normalize(vRn),normalize(vRv)),0.0);\ngl_FragColor.rgb+=uRimC*pow(rimF,2.4)*0.42;'
+        );
   };
-  m.customProgramCacheKey = () => 'tex-' + kind;
+  m.customProgramCacheKey = () => 'tex2-' + kind;
   return m;
 }
 const CHAR_MAT = texMat(new THREE.MeshLambertMaterial({ vertexColors: true }), 'char'),

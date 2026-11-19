@@ -902,6 +902,10 @@ function buildWorld(idx) {
   scene.background.setHex(TH.bg);
   scene.fog.color.setHex(TH.bg);
   hemi.color.setHex(TH.sky);
+  RIMU.value
+    .setHex(TH.sky)
+    .lerp(tmpC.setHex(0xffffff), 0.35)
+    .multiplyScalar(TH.dark ? 0.6 : 1);
   hemi.groundColor.setHex(TH.ground);
   hemi.intensity = TH.hemiI;
   sun.color.setHex(TH.sun);
